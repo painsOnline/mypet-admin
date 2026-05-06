@@ -108,7 +108,7 @@
           <el-input v-model="typeForm.name" placeholder="请输入类型名称" />
         </el-form-item>
         <el-form-item label="排序" prop="sort">
-          <el-input-number v-model="typeForm.sort" :min="0" style="width: 100%" />
+          <el-input-number v-model="typeForm.sort" :min="0" style="width: 130px" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -171,7 +171,7 @@
           </div>
         </el-form-item>
         <el-form-item label="排序" prop="sort">
-          <el-input-number v-model="specForm.sort" :min="0" style="width: 100%" />
+          <el-input-number v-model="specForm.sort" :min="0" style="width: 130px" />
         </el-form-item>
       </el-form>
       <template #footer>
