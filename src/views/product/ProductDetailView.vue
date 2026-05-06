@@ -2,137 +2,82 @@
   <div class="product-detail">
     <el-card>
       <template #header>
-        <div class="card-header">
-          <h3>{{ isCreate ? '新增商品' : '编辑商品' }}</h3>
-        </div>
+        <h3>{{ isCreate ? '新增商品' : '编辑商品' }}</h3>
       </template>
 
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" size="default">
-        <!-- Basic Info -->
-        <el-divider content-position="left">基本信息</el-divider>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="商品名称" prop="name">
-              <el-input v-model="form.name" placeholder="请输入商品名称" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="商品描述" prop="desc">
-              <el-input v-model="form.desc" placeholder="请输入商品描述" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="商品分类" prop="productCategory">
-              <el-select v-model="form.productCategory" placeholder="请选择分类" style="width: 100%">
-                <el-option
-                  v-for="c in categories"
-                  :key="c.id"
-                  :label="c.name"
-                  :value="c.id"
-                />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="商品类型" prop="productType">
-              <el-select
-                v-model="form.productType"
-                placeholder="请选择类型"
-                style="width: 100%"
-                @change="onTypeChange"
-              >
-                <el-option
-                  v-for="t in types"
-                  :key="t.id"
-                  :label="t.name"
-                  :value="t.id"
-                />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :span="8">
-            <el-form-item label="价格" prop="price">
-              <el-input-number v-model="form.price" :min="0" :precision="2" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="原价" prop="oldPrice">
-              <el-input-number v-model="form.oldPrice" :min="0" :precision="2" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="排序" prop="sort">
-              <el-input-number v-model="form.sort" :min="0" style="width: 120px" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-form-item label="商品主图" prop="picture">
-          <ImageUploader v-model="form.picture" />
-          <div style="color:#909399;font-size:12px;margin-top:4px">仅一张，用于商品列表展示</div>
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" size="default">
+
+        <!-- 基本信息 -->
+        <h4 class="section-title">基本信息</h4>
+        <el-form-item label="商品名称" prop="name">
+          <el-input v-model="form.name" placeholder="请输入商品名称" style="max-width:500px" />
         </el-form-item>
-        <el-form-item label="商品轮播图" prop="mainPictures">
+        <el-form-item label="商品描述" prop="desc">
+          <el-input v-model="form.desc" placeholder="请输入商品描述" style="max-width:500px" />
+        </el-form-item>
+        <el-form-item label="商品分类" prop="productCategory">
+          <el-select v-model="form.productCategory" placeholder="请选择分类" style="width:240px">
+            <el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="商品类型" prop="productType">
+          <el-select v-model="form.productType" placeholder="请选择类型" style="width:240px" @change="onTypeChange">
+            <el-option v-for="t in types" :key="t.id" :label="t.name" :value="t.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="价格" prop="price">
+          <el-input-number v-model="form.price" :min="0" :precision="2" style="width:200px" />&nbsp;元
+        </el-form-item>
+        <el-form-item label="原价" prop="oldPrice">
+          <el-input-number v-model="form.oldPrice" :min="0" :precision="2" style="width:200px" />&nbsp;元
+        </el-form-item>
+        <el-form-item label="排序">
+          <el-input-number v-model="form.sort" :min="0" style="width:120px" />
+        </el-form-item>
+        <el-form-item label="商品主图">
+          <ImageUploader v-model="form.picture" />
+          <div class="form-hint">仅一张，用于商品列表展示</div>
+        </el-form-item>
+        <el-form-item label="商品轮播图">
           <ImageUploader v-model="form.mainPictures" />
-          <div style="color:#909399;font-size:12px;margin-top:4px">可上传多张图片，用于商品详情页轮播展示</div>
+          <div class="form-hint">可上传多张图片，用于商品详情页轮播展示</div>
         </el-form-item>
 
-        <!-- Properties (Display-only specs) — user selects which to add -->
+        <!-- 商品属性 -->
         <template v-if="displaySpecs.length > 0">
-          <el-divider content-position="left">商品属性</el-divider>
-          <div v-if="availableSpecs.length > 0" style="margin-bottom:12px">
-            <span style="font-size:13px;color:#909399;margin-right:8px">添加属性：</span>
-            <el-button
-              v-for="spec in availableSpecs"
-              :key="spec.id"
-              size="small"
-              style="margin-right:6px;margin-bottom:4px"
-              @click="addProperty(spec)"
-            >
+          <h4 class="section-title">商品属性</h4>
+          <div v-if="availableSpecs.length > 0" class="property-add-bar">
+            <span class="property-add-label">添加属性：</span>
+            <el-button v-for="spec in availableSpecs" :key="spec.id" size="small" @click="addProperty(spec)">
               <el-icon><Plus /></el-icon> {{ spec.name }}
             </el-button>
           </div>
-          <div v-if="properties.length === 0" style="color:#c0c4cc;font-size:13px;padding:8px 0">
-            暂无属性，点击上方按钮添加需要的商品属性
-          </div>
-          <div v-for="(prop, idx) in properties" :key="idx" class="property-group">
+          <div v-if="properties.length === 0" class="form-hint">暂无属性，点击上方按钮添加需要的商品属性</div>
+          <div v-for="(prop, idx) in properties" :key="idx" class="property-row">
             <el-form-item :label="prop.name">
-              <div style="display:flex;align-items:center;gap:8px">
-                <template v-if="prop.inputType === 1">
-                  <el-input v-model="prop.value" placeholder="请输入值" style="width:260px" />
-                </template>
-                <template v-else-if="prop.inputType === 2">
-                  <el-select v-model="prop.value" placeholder="请选择" style="width:260px">
-                    <el-option v-for="opt in (prop.options || [])" :key="opt" :label="opt" :value="opt" />
-                  </el-select>
-                </template>
-                <template v-else-if="prop.inputType === 3">
-                  <el-select v-model="prop.value" multiple placeholder="请选择" style="width:260px">
-                    <el-option v-for="opt in (prop.options || [])" :key="opt" :label="opt" :value="opt" />
-                  </el-select>
-                </template>
+              <div class="property-input-row">
+                <el-input v-if="prop.inputType === 1" v-model="prop.value" placeholder="请输入值" style="width:260px" />
+                <el-select v-else-if="prop.inputType === 2" v-model="prop.value" placeholder="请选择" style="width:260px">
+                  <el-option v-for="opt in (prop.options || [])" :key="opt" :label="opt" :value="opt" />
+                </el-select>
+                <el-select v-else-if="prop.inputType === 3" v-model="prop.value" multiple placeholder="请选择" style="width:260px">
+                  <el-option v-for="opt in (prop.options || [])" :key="opt" :label="opt" :value="opt" />
+                </el-select>
                 <el-button type="danger" :icon="Delete" circle size="small" @click="removeProperty(idx)" />
               </div>
             </el-form-item>
           </div>
         </template>
 
-        <!-- SKU Management -->
-        <el-divider content-position="left">SKU管理</el-divider>
-        <div class="sku-section">
-          <SkuEditor v-model:skus="form.skus" :specs="skuSpecs" />
-        </div>
+        <!-- SKU管理 -->
+        <h4 class="section-title">SKU管理</h4>
+        <SkuEditor v-model:skus="form.skus" :specs="skuSpecs" />
 
-        <!-- Detail -->
-        <el-divider content-position="left">商品详情</el-divider>
-        <el-form-item label="详情内容" prop="detail" label-width="120px">
-          <RichTextEditor v-model="form.detail" />
-        </el-form-item>
+        <!-- 商品详情 -->
+        <h4 class="section-title">商品详情</h4>
+        <RichTextEditor v-model="form.detail" />
 
-        <!-- Submit -->
-        <el-divider />
+        <!-- 提交 -->
         <div class="form-footer">
           <el-button @click="router.back()">取消</el-button>
           <el-button type="primary" :loading="submitLoading" @click="handleSubmit">
@@ -352,28 +297,56 @@ onMounted(async () => {
   margin: 0 auto;
 }
 
-.card-header h3 {
+h3 {
   margin: 0;
   font-size: 18px;
   color: #303133;
 }
 
-.sku-section {
-  margin-top: 0;
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+  margin: 24px 0 10px 0;
+  padding: 0 0 8px 0;
+  border-bottom: 1px solid #ebeef5;
+}
+.section-title:first-of-type {
+  margin-top: 8px;
 }
 
-.sku-actions {
+.form-hint {
+  color: #909399;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.property-add-bar {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-bottom: 12px;
+}
+.property-add-label {
+  font-size: 13px;
+  color: #909399;
+  margin-right: 2px;
+}
+
+.property-row {
+  margin-bottom: 0;
+}
+.property-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .form-footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #ebeef5;
   text-align: center;
-  padding-bottom: 16px;
-}
-
-.property-group {
-  margin-bottom: 0;
 }
 </style>

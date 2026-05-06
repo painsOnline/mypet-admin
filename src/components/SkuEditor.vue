@@ -387,7 +387,7 @@ watch(localSkus, () => {
 <style lang="scss" scoped>
 .sku-editor { width: 100%; }
 .empty-hint { padding: 40px; text-align: center; color: #909399; font-size: 14px; }
-.section-title { font-size: 14px; font-weight: 600; color: #303133; margin: 0 0 12px 0; }
+.section-title { font-size: 13px; font-weight: 400; color: #606266; margin: 0 0 8px 0; }
 .spec-values-cell { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 
 .spec-value-tag {
