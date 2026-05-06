@@ -85,8 +85,6 @@ async function handleLogin() {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  max-width: 1400px;
-  margin: 0 auto;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 

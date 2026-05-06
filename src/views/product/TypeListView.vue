@@ -142,7 +142,13 @@
           </el-select>
         </el-form-item>
         <el-form-item label="选项值">
-          <div class="spec-options-editor">
+          <!-- 唯一值: single text input -->
+          <div v-if="specForm.inputType === 1" class="spec-options-editor">
+            <el-input v-model="specForm._newOption" placeholder="请输入默认值" size="small" style="width:200px"
+              @input="specForm.inputOptions = specForm._newOption ? [specForm._newOption] : []" />
+          </div>
+          <!-- 单选/多选: tag-based multi-value editor -->
+          <div v-else class="spec-options-editor">
             <el-tag
               v-for="(opt, idx) in specForm.inputOptions"
               :key="idx"
@@ -306,13 +312,14 @@ function handleOpenEditSpec(spec, typeRow) {
   specIsEdit.value = true
   specEditId.value = spec.id
   specTypeDisabled.value = spec.type === 1 && (typeRow.specs || []).filter((s: any) => s.type === 1).length <= 1
+  const options = Array.isArray(spec.inputOptions) ? [...spec.inputOptions] : []
   Object.assign(specForm, {
     name: spec.name,
     type: spec.type,
     inputType: spec.inputType,
-    inputOptions: Array.isArray(spec.inputOptions) ? [...spec.inputOptions] : [],
+    inputOptions: options,
     sort: spec.sort || 0,
-    _newOption: '',
+    _newOption: spec.inputType === 1 ? (options[0] || '') : '',
   })
   specDialogVisible.value = true
 }

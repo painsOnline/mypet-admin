@@ -9,14 +9,23 @@
           <thead>
             <tr>
               <th style="width:120px">规格名称</th>
-              <th>规格值（点击切换选中/取消）</th>
+              <th>规格值</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="spec in editableSpecs" :key="spec.id">
               <td style="font-weight:500;color:#303133">{{ spec.name }}</td>
               <td style="text-align:left">
-                <span class="spec-values-cell">
+                <!-- 唯一值: single text input for manual entry -->
+                <span v-if="spec.inputType === 1" class="spec-values-cell">
+                  <el-input
+                    :model-value="spec.inputOptions[0] || ''"
+                    @update:model-value="(v: string) => { spec.inputOptions[0] = v; syncSpecToBackend(spec); generateCombinations() }"
+                    size="small" style="width:200px" placeholder="请输入规格值"
+                  />
+                </span>
+                <!-- 单选/多选: selectable value tags -->
+                <span v-else class="spec-values-cell">
                   <span
                     v-for="(val, vi) in spec.inputOptions"
                     :key="vi"
