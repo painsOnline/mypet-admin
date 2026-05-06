@@ -15,6 +15,20 @@
           <el-icon><DataAnalysis /></el-icon>
           <span>仪表盘</span>
         </el-menu-item>
+        <el-sub-menu index="statistics-group">
+          <template #title>
+            <el-icon><DataLine /></el-icon>
+            <span>数据统计</span>
+          </template>
+          <el-menu-item index="/statistics/sales">
+            <el-icon><TrendCharts /></el-icon>
+            <span>销售额统计</span>
+          </el-menu-item>
+          <el-menu-item index="/statistics/products">
+            <el-icon><PieChart /></el-icon>
+            <span>商品统计</span>
+          </el-menu-item>
+        </el-sub-menu>
         <el-sub-menu index="product-group">
           <template #title>
             <el-icon><Goods /></el-icon>
@@ -45,20 +59,6 @@
           <el-menu-item index="/order">
             <el-icon><List /></el-icon>
             <span>订单列表</span>
-          </el-menu-item>
-        </el-sub-menu>
-        <el-sub-menu index="statistics-group">
-          <template #title>
-            <el-icon><DataLine /></el-icon>
-            <span>数据统计</span>
-          </template>
-          <el-menu-item index="/statistics/sales">
-            <el-icon><TrendCharts /></el-icon>
-            <span>销售额统计</span>
-          </el-menu-item>
-          <el-menu-item index="/statistics/products">
-            <el-icon><PieChart /></el-icon>
-            <span>商品统计</span>
           </el-menu-item>
         </el-sub-menu>
         <el-menu-item index="/user">

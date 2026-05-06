@@ -102,19 +102,27 @@ export function getOrderDetail(id) {
 }
 
 export function dispatchOrder(id) {
-  return request({ url: `/admin/order/${id}/delivery`, method: 'put' })
+  return request({ url: `/admin/order/${id}/dispatch`, method: 'put' })
+}
+
+export function batchDispatchOrder(ids) {
+  return request({ url: '/admin/order/batch/dispatch', method: 'put', data: ids })
+}
+
+export function batchCancelOrder(ids) {
+  return request({ url: '/admin/order/batch/cancel', method: 'put', data: ids })
 }
 
 export function confirmReceipt(id) {
-  return request({ url: `/admin/order/${id}/receipt`, method: 'put' })
+  return request({ url: `/admin/order/${id}/confirmReceipt`, method: 'put' })
 }
 
 export function approveRefund(id) {
-  return request({ url: `/admin/order/${id}/refund/approve`, method: 'put' })
+  return request({ url: `/admin/order/${id}/approveRefund`, method: 'put' })
 }
 
 export function rejectRefund(id) {
-  return request({ url: `/admin/order/${id}/refund/reject`, method: 'put' })
+  return request({ url: `/admin/order/${id}/rejectRefund`, method: 'put' })
 }
 
 export function cancelOrder(id) {

@@ -123,7 +123,7 @@ async function fetchData() {
 
 const volumeOption = computed(() => ({
   tooltip: { trigger: 'axis' },
-  grid: { left: 60, right: 30, top: 20, bottom: 40 },
+  grid: { left: 60, right: 30, top: 30, bottom: 40, containLabel: true },
   xAxis: {
     type: 'category',
     data: trendData.value.map((p) => p.dateKey),
@@ -142,7 +142,7 @@ const volumeOption = computed(() => ({
 
 const amountOption = computed(() => ({
   tooltip: { trigger: 'axis', valueFormatter: (val) => '¥' + (Number(val) || 0).toFixed(2) },
-  grid: { left: 80, right: 30, top: 20, bottom: 40 },
+  grid: { left: 80, right: 30, top: 30, bottom: 40, containLabel: true },
   xAxis: {
     type: 'category',
     data: trendData.value.map((p) => p.dateKey),
