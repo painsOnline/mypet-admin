@@ -53,7 +53,7 @@
                       <el-icon><Edit /></el-icon>
                       编辑
                     </el-button>
-                    <el-popconfirm v-if="!isOnlySkuSpec(row, spec)" title="确定删除该规格？" @confirm="handleDeleteSpec(spec)">
+                    <el-popconfirm v-if="canDeleteSpec(row, spec)" title="确定删除该规格？" @confirm="handleDeleteSpec(spec)">
                       <template #reference>
                         <el-button type="danger" size="small">
                           <el-icon><Delete /></el-icon>
@@ -152,7 +152,7 @@
             <el-tag
               v-for="(opt, idx) in specForm.inputOptions"
               :key="idx"
-              closable
+              :closable="!isOptionUsed(opt)"
               @close="removeSpecOption(idx)"
               style="margin-right: 4px; margin-bottom: 4px"
             >
@@ -269,6 +269,7 @@ const specForm = reactive({
   inputOptions: [],
   sort: 0,
   _newOption: '',
+  _usedOptions: [] as string[],
 })
 
 const specRules = {
@@ -278,7 +279,7 @@ const specRules = {
 }
 
 function resetSpecForm() {
-  Object.assign(specForm, { name: '', type: 1, inputType: 1, inputOptions: [], sort: 0, _newOption: '' })
+  Object.assign(specForm, { name: '', type: 1, inputType: 1, inputOptions: [], sort: 0, _newOption: '', _usedOptions: [] })
   specIsEdit.value = false
   specEditId.value = ''
   currentTypeId.value = ''
@@ -296,6 +297,10 @@ function addSpecOption() {
 function removeSpecOption(index) {
   if (specForm.inputOptions.length <= 1) {
     ElMessage.warning('规格值至少需要一个')
+    return
+  }
+  if (isOptionUsed(specForm.inputOptions[index])) {
+    ElMessage.warning('该规格值已被商品SKU使用，无法删除')
     return
   }
   specForm.inputOptions.splice(index, 1)
@@ -320,6 +325,7 @@ function handleOpenEditSpec(spec, typeRow) {
     inputOptions: options,
     sort: spec.sort || 0,
     _newOption: spec.inputType === 1 ? (options[0] || '') : '',
+    _usedOptions: spec.usedOptions || [],
   })
   specDialogVisible.value = true
 }
@@ -376,6 +382,18 @@ function isOnlySkuSpec(typeRow, spec) {
   if (spec.type !== 1) return false
   const skuSpecs = (typeRow.specs || []).filter((s: any) => s.type === 1)
   return skuSpecs.length <= 1
+}
+
+function canDeleteSpec(typeRow, spec) {
+  // Cannot delete the last SKU spec of a type
+  if (isOnlySkuSpec(typeRow, spec)) return false
+  // Cannot delete SKU spec if type already has products
+  if (spec.type === 1 && typeRow.productCount > 0) return false
+  return true
+}
+
+function isOptionUsed(value: string) {
+  return specForm._usedOptions.includes(value)
 }
 
 async function loadData() {
