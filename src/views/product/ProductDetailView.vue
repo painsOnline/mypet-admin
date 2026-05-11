@@ -15,6 +15,11 @@
         <el-form-item label="商品描述" prop="desc">
           <el-input v-model="form.desc" placeholder="请输入商品描述" style="max-width:500px" />
         </el-form-item>
+        <el-form-item label="商品品牌" prop="productBrand">
+          <el-select v-model="form.productBrand" placeholder="请选择品牌" style="width:240px">
+            <el-option v-for="b in brandList" :key="b.id" :label="b.brandName" :value="b.id" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="商品分类" prop="productCategory">
           <el-select v-model="form.productCategory" placeholder="请选择分类" style="width:240px">
             <el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id" />
@@ -44,7 +49,7 @@
         </el-form-item>
 
         <!-- 商品属性 -->
-        <template v-if="displaySpecs.length > 0">
+        <template v-if="displaySpecs.length > 0 || properties.length > 0">
           <h4 class="section-title">商品属性</h4>
           <div v-if="availableSpecs.length > 0" class="property-add-bar">
             <span class="property-add-label">添加属性：</span>
@@ -92,7 +97,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { getProductDetail, createProduct, updateProduct, getCategories, getTypes } from '@/api'
+import { getProductDetail, createProduct, updateProduct, getCategories, getTypes, getBrands } from '@/api'
 import { ElMessage } from 'element-plus'
 import { Plus, Delete } from '@element-plus/icons-vue'
 import ImageUploader from '@/components/ImageUploader.vue'
@@ -114,12 +119,14 @@ const submitLoading = ref(false)
 
 const categories = ref([])
 const types = ref([])
+const brandList = ref([])
 
 const form = reactive({
   id: '',
   name: '',
   desc: '',
   productCategory: '',
+  productBrand: '',
   productType: '',
   price: 0,
   oldPrice: 0,
@@ -134,6 +141,7 @@ const form = reactive({
 const rules = {
   name: [{ required: true, message: '请输入商品名称', trigger: 'blur' }],
   productCategory: [{ required: true, message: '请选择商品分类', trigger: 'change' }],
+  productBrand: [{ required: true, message: '请选择商品品牌', trigger: 'change' }],
   productType: [{ required: true, message: '请选择商品类型', trigger: 'change' }],
   price: [{ required: true, message: '请输入价格', trigger: 'blur' }],
 }
@@ -197,6 +205,7 @@ async function handleSubmit() {
       name: form.name,
       desc: form.desc,
       productCategory: form.productCategory,
+      productBrand: form.productBrand,
       productType: form.productType,
       price: form.price,
       oldPrice: form.oldPrice,
@@ -243,6 +252,7 @@ async function loadProduct(id) {
     form.id = p.id || ''
     form.name = p.name || ''
     form.desc = p.desc || ''
+    form.productBrand = p.productBrand || ''
     form.productCategory = p.productCategory || ''
     form.productType = p.productType || ''
     form.price = p.price || 0
@@ -261,13 +271,14 @@ async function loadProduct(id) {
     if (p.properties && p.properties.length > 0) {
       p.properties.forEach((pp) => {
         const spec = displaySpecs.value.find(s => s.name === pp.name)
+        const rawValue = pp.valueName || pp.value || ''
         properties.push({
           name: pp.name,
           productType: pp.productType || p.productType,
           inputType: spec ? spec.inputType : 1,
           options: spec ? (spec.inputOptions || []) : [],
-          value: pp.value && spec && spec.inputType === 3 && typeof pp.value === 'string'
-            ? pp.value.split(',').filter(v => v) : (pp.value || ''),
+          value: spec && spec.inputType === 3 && typeof rawValue === 'string'
+            ? rawValue.split(',').filter(v => v) : rawValue,
         })
       })
     }
@@ -278,9 +289,10 @@ async function loadProduct(id) {
 
 onMounted(async () => {
   try {
-    const [catData, typeData] = await Promise.all([getCategories(), getTypes()])
+    const [catData, typeData, brandData] = await Promise.all([getCategories(), getTypes(), getBrands()])
     categories.value = catData || []
     types.value = typeData || []
+    brandList.value = brandData || []
   } catch (e) {
     // handled
   }

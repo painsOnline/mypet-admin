@@ -129,6 +129,23 @@ export function cancelOrder(id) {
   return request({ url: `/admin/order/${id}/cancel`, method: 'put' })
 }
 
+// ---- Brand ----
+export function getBrands() {
+  return request({ url: '/admin/brand', method: 'get' })
+}
+
+export function createBrand(data) {
+  return request({ url: '/admin/brand', method: 'post', data })
+}
+
+export function updateBrand(id, data) {
+  return request({ url: `/admin/brand/${id}`, method: 'put', data })
+}
+
+export function deleteBrand(id) {
+  return request({ url: `/admin/brand/${id}`, method: 'delete' })
+}
+
 // ---- User ----
 export function getUsers(params) {
   return request({ url: '/admin/user', method: 'get', params })

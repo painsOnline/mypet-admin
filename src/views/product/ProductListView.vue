@@ -5,6 +5,9 @@
         <el-form-item label="商品名称">
           <el-input v-model="searchForm.name" placeholder="请输入名称" clearable />
         </el-form-item>
+        <el-form-item label="条形码">
+          <el-input v-model="searchForm.barcode" placeholder="支持后N位模糊搜索" clearable style="width:180px" />
+        </el-form-item>
         <el-form-item label="分类">
           <el-select v-model="searchForm.categoryId" placeholder="请选择分类" clearable style="width: 160px">
             <el-option
@@ -23,6 +26,11 @@
               :label="t.name"
               :value="t.id"
             />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="品牌">
+          <el-select v-model="searchForm.brandId" placeholder="请选择品牌" clearable style="width: 160px">
+            <el-option v-for="b in brandList" :key="b.id" :label="b.brandName" :value="b.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="价格区间">
@@ -142,7 +150,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getProducts, getCategories, getTypes, toggleHotProduct, toggleProductEnable, deleteProduct } from '@/api'
+import { getProducts, getCategories, getTypes, getBrands, toggleHotProduct, toggleProductEnable, deleteProduct } from '@/api'
 import { ElMessage } from 'element-plus'
 import { Search, RefreshRight, Plus, Edit, Star, Delete } from '@element-plus/icons-vue'
 
@@ -153,6 +161,8 @@ const searchForm = reactive({
   name: '',
   categoryId: '',
   typeId: '',
+  brandId: '',
+  barcode: '',
   minPrice: undefined,
   maxPrice: undefined,
   dateRange: [],
@@ -172,6 +182,7 @@ const pagination = reactive({
 const tableData = ref([])
 const categories = ref([])
 const types = ref([])
+const brandList = ref([])
 
 function getCategoryName(id) {
   const found = categories.value.find((c) => c.id === id)
@@ -191,6 +202,8 @@ function buildSearchParams() {
   if (searchForm.name) params.name = searchForm.name
   if (searchForm.categoryId) params.categoryIds = [searchForm.categoryId]
   if (searchForm.typeId) params.typeIds = [searchForm.typeId]
+  if (searchForm.brandId) params.brandId = searchForm.brandId
+  if (searchForm.barcode) params.barcode = searchForm.barcode
   if (searchForm.minPrice !== undefined && searchForm.minPrice !== null) params.minPrice = searchForm.minPrice
   if (searchForm.maxPrice !== undefined && searchForm.maxPrice !== null) params.maxPrice = searchForm.maxPrice
   if (searchForm.dateRange && searchForm.dateRange.length === 2) {
@@ -305,6 +318,8 @@ onMounted(async () => {
     const [catData, typeData] = await Promise.all([getCategories(), getTypes()])
     categories.value = catData || []
     types.value = typeData || []
+    const brandData = await getBrands()
+    brandList.value = brandData || []
   } catch (e) {
     // handled
   }

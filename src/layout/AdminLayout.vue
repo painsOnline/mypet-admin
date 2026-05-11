@@ -2,7 +2,7 @@
   <el-container class="h-full">
     <el-aside width="220px" class="aside">
       <div class="logo">
-        <h2>宠物用品社区店</h2>
+        <h2>{{ shopTitle }}</h2>
       </div>
       <el-menu
         :default-active="activeMenu"
@@ -46,6 +46,10 @@
             <el-icon><Setting /></el-icon>
             <span>商品类型</span>
           </el-menu-item>
+          <el-menu-item index="/product/brand">
+            <el-icon><PriceTag /></el-icon>
+            <span>品牌管理</span>
+          </el-menu-item>
         </el-sub-menu>
         <el-sub-menu index="order-group">
           <template #title>
@@ -61,10 +65,16 @@
             <span>订单列表</span>
           </el-menu-item>
         </el-sub-menu>
-        <el-menu-item index="/user">
-          <el-icon><User /></el-icon>
-          <span>用户管理</span>
-        </el-menu-item>
+        <el-sub-menu index="user-group">
+          <template #title>
+            <el-icon><User /></el-icon>
+            <span>用户管理</span>
+          </template>
+          <el-menu-item index="/user">
+            <el-icon><List /></el-icon>
+            <span>用户列表</span>
+          </el-menu-item>
+        </el-sub-menu>
         <el-sub-menu index="shop-group">
           <template #title>
             <el-icon><Shop /></el-icon>
@@ -88,117 +98,77 @@
     <el-container>
       <el-header class="header">
         <div class="header-left">
-          <span class="shop-name">宠物用品社区店</span>
+          <span class="shop-name">{{ shopTitle }}</span>
         </div>
         <div class="header-right">
           <span class="admin-info">
             <el-icon><UserFilled /></el-icon>
-            {{ authStore.adminInfo?.account || '管理员' }}
+            {{ authStore.adminInfo.account }}
           </span>
-          <el-button type="danger" size="small" @click="handleLogout" text>
-            <el-icon><SwitchButton /></el-icon>
-            退出登录
-          </el-button>
+          <el-button type="danger" size="small" text @click="handleLogout">退出</el-button>
         </div>
       </el-header>
-      <el-main class="main">
-        <router-view />
-      </el-main>
+      <el-main><router-view /></el-main>
     </el-container>
   </el-container>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ElMessageBox } from 'element-plus'
+import { getShopSettings } from '@/api'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
 const activeMenu = computed(() => route.path)
+const shopName = ref('')
+const shopTitle = computed(() => shopName.value ? `宠物社区私域-${shopName.value}` : '宠物社区私域')
+
+async function loadShop() {
+  try {
+    const shop = await getShopSettings()
+    if (shop) {
+      shopName.value = shop.name || ''
+      document.title = shopTitle.value + ' - 店主管理后台'
+    }
+  } catch {}
+}
+
+onMounted(() => loadShop())
 
 function handleLogout() {
   ElMessageBox.confirm('确定要退出登录吗？', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning',
-  }).then(() => {
-    authStore.logout()
-    router.push('/login')
-  }).catch(() => {})
+    confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning',
+  }).then(() => { authStore.logout(); router.push('/login') }).catch(() => {})
 }
 </script>
 
 <style lang="scss" scoped>
-.h-full {
-  height: 100vh;
-}
-
 .aside {
   background-color: #304156;
   overflow-y: auto;
+  height: 100vh;
+  .logo {
+    padding: 20px 12px;
+    h2 {
+      color: #fff;
+      font-size: 16px;
+      text-align: center;
+    }
+  }
 }
-
-.logo {
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #263445;
-}
-
-.logo h2 {
-  color: #fff;
-  font-size: 16px;
-  margin: 0;
-  white-space: nowrap;
-}
-
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   background: #fff;
   border-bottom: 1px solid #e6e6e6;
-  padding: 0 20px;
-  height: 60px;
 }
-
-.header-left {
-  display: flex;
-  align-items: center;
-}
-
-.shop-name {
-  font-size: 16px;
-  font-weight: bold;
-  color: #303133;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.admin-info {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: #606266;
-  font-size: 14px;
-}
-
-.main {
-  background-color: #f0f2f5;
-  padding: 20px;
-  overflow-y: auto;
-}
-
-.el-menu {
-  border-right: none;
-}
+.header-left .shop-name { font-size: 16px; font-weight: 600; }
+.header-right { display: flex; align-items: center; gap: 12px; }
+.shop-name { font-size: 16px; font-weight: 600; }
 </style>

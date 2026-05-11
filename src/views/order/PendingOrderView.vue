@@ -45,7 +45,7 @@
         <el-table-column label="订单信息" min-width="200">
           <template #default="{ row }">
             <div class="info-cell">
-              <div>订单编号：{{ row.id }}</div>
+              <div>订单编号：{{ row.orderNo || row.id }}</div>
               <div>下单时间：{{ row.createTime }}</div>
               <div v-if="row.dispatchTime">发货时间：{{ row.dispatchTime }}</div>
               <div v-if="row.receiptTime">收货时间：{{ row.receiptTime }}</div>
@@ -57,7 +57,7 @@
             <div class="buyer-cell">
               <el-avatar v-if="row.memberAvatar" :src="row.memberAvatar" :size="32" />
               <el-icon v-else :size="32"><UserFilled /></el-icon>
-              <div class="buyer-phone"><el-icon><Phone /></el-icon> {{ row.memberMobile || '-' }}</div>
+              <div class="buyer-phone"><el-icon><Phone /></el-icon> {{ row.receiverPhone || '-' }}</div>
             </div>
           </template>
         </el-table-column>
@@ -68,6 +68,7 @@
               <div><span class="amount-label">总金额：</span><span class="amount-value">¥{{ row.totalMoney }}</span></div>
               <div><span class="amount-label">应收金额：</span><span class="amount-value">¥{{ row.payMoney }}</span></div>
               <div><span class="amount-label">实收金额：</span><span class="amount-value">¥{{ row.actualPayMoney }}</span></div>
+              <div><span class="amount-label">毛利：</span><span class="amount-value" style="color:#67c23a">¥{{ row.profitMoney ?? 0 }}</span></div>
             </div>
           </template>
         </el-table-column>
@@ -77,6 +78,7 @@
               <div>姓名：{{ row.receiverName || '-' }}</div>
               <div>手机：{{ row.receiverPhone || '-' }}</div>
               <div>地区：{{ row.receiverAddress || '-' }}</div>
+              <div v-if="row.deliveryTime">配送时间：{{ row.deliveryTime }}</div>
               <div v-if="row.buyerMessage">订单备注：{{ row.buyerMessage }}</div>
             </div>
           </template>
@@ -121,9 +123,10 @@
                   <el-tag :type="statusType(orderDetail.orderStatus)" size="small">{{ statusLabel(orderDetail.orderStatus) }}</el-tag>
                 </el-descriptions-item>
                 <el-descriptions-item label="订单备注">{{ orderDetail.buyerMessage || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="配送时间">{{ orderDetail.deliveryTime || '-' }}</el-descriptions-item>
                 <el-descriptions-item label="收货人姓名">{{ orderDetail.receiver?.receiver || '-' }}</el-descriptions-item>
                 <el-descriptions-item label="收货人电话">{{ orderDetail.receiver?.contact || '-' }}</el-descriptions-item>
-                <el-descriptions-item label="收货地址">{{ orderDetail.receiver?.fullLocation || orderDetail.receiver?.address || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="收货地址">{{ (orderDetail.receiver?.fullLocation || '') + ' ' + (orderDetail.receiver?.address || '') || '-' }}</el-descriptions-item>
               </el-descriptions>
             </el-card>
             <el-card shadow="never" class="detail-card" style="margin-top:12px">

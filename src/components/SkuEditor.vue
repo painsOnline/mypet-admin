@@ -70,7 +70,9 @@
               <th>SKU图片</th>
               <th>价格</th>
               <th>原价</th>
+              <th>成本价</th>
               <th>库存</th>
+              <th>条形码</th>
             </tr>
           </thead>
           <tbody>
@@ -90,15 +92,23 @@
                   :class="{ 'is-error': isSkuActive(sku) && (!sku.oldPrice || sku.oldPrice <= 0) }" />
               </td>
               <td>
+                <el-input-number v-model="localSkus[si].costPrice" :min="0" :precision="2" size="small"
+                  controls-position="right" style="width:110px"
+                  :class="{ 'is-error': isSkuActive(sku) && (!sku.costPrice || sku.costPrice <= 0) }" />
+              </td>
+              <td>
                 <el-input-number v-model="localSkus[si].inventory" :min="0" size="small"
                   controls-position="right" style="width:80px"
                   :class="{ 'is-error': isSkuActive(sku) && (!sku.inventory || sku.inventory <= 0) }" />
+              </td>
+              <td>
+                <el-input v-model="localSkus[si].barcode" size="small" style="width:130px" placeholder="选填" />
               </td>
             </tr>
           </tbody>
         </table>
       </div>
-      <p class="sku-hint">填写任意字段（图片/价格/原价/库存）即表示该SKU有效，所有字段均需填写完整；整行留空则该SKU无效，不会被保存。</p>
+      <p class="sku-hint">填写价格、成本价、库存即表示该SKU有效；条形码为选填。整行留空则该SKU无效，不会被保存。</p>
     </template>
   </div>
 </template>
@@ -263,7 +273,9 @@ function rebuildSkus() {
     return {
       price: old ? old.price : 0,
       oldPrice: old ? old.oldPrice : 0,
+      costPrice: old ? old.costPrice : 0,
       inventory: old ? old.inventory : 0,
+      barcode: old ? old.barcode : '',
       picture: old ? old.picture : '',
       specs: combo,
       specMap,
@@ -332,7 +344,9 @@ function mergeSkus(skuList: any[]) {
       if (localKey === key) {
         localSkus[i].price = backendSku.price || 0
         localSkus[i].oldPrice = backendSku.oldPrice || 0
+        localSkus[i].costPrice = backendSku.costPrice || 0
         localSkus[i].inventory = backendSku.inventory || 0
+        localSkus[i].barcode = backendSku.barcode || ''
         localSkus[i].picture = backendSku.picture || ''
         break
       }

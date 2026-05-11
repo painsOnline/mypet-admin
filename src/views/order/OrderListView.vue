@@ -68,7 +68,7 @@
         <el-table-column label="订单信息" min-width="200">
           <template #default="{ row }">
             <div class="info-cell">
-              <div>订单编号：{{ row.id }}</div>
+              <div>订单编号：{{ row.orderNo || row.id }}</div>
               <div>下单时间：{{ row.createTime }}</div>
               <div v-if="row.dispatchTime">发货时间：{{ row.dispatchTime }}</div>
               <div v-if="row.receiptTime">收货时间：{{ row.receiptTime }}</div>
@@ -81,7 +81,7 @@
             <div class="buyer-cell">
               <el-avatar v-if="row.memberAvatar" :src="row.memberAvatar" :size="32" />
               <el-icon v-else :size="32"><UserFilled /></el-icon>
-              <div class="buyer-phone"><el-icon><Phone /></el-icon> {{ row.memberMobile || '-' }}</div>
+              <div class="buyer-phone"><el-icon><Phone /></el-icon> {{ row.receiverPhone || '-' }}</div>
             </div>
           </template>
         </el-table-column>
@@ -92,6 +92,7 @@
               <div><span class="amount-label">总金额：</span><span class="amount-value">¥{{ row.totalMoney }}</span></div>
               <div><span class="amount-label">应收金额：</span><span class="amount-value">¥{{ row.payMoney }}</span></div>
               <div><span class="amount-label">实收金额：</span><span class="amount-value">¥{{ row.actualPayMoney }}</span></div>
+<div><span class="amount-label">毛利：</span><span class="amount-value" style="color:#67c23a">¥{{ row.profitMoney ?? 0 }}</span></div>
             </div>
           </template>
         </el-table-column>
@@ -100,7 +101,8 @@
             <div class="info-cell">
               <div>姓名：{{ row.receiverName || '-' }}</div>
               <div>手机：{{ row.receiverPhone || '-' }}</div>
-              <div>地区：{{ row.receiverAddress || '-' }}</div>
+              <div>地址：{{ row.receiverAddress || '-' }}</div>
+              <div v-if="row.deliveryTime">配送时间：{{ row.deliveryTime }}</div>
               <div v-if="row.buyerMessage">订单备注：{{ row.buyerMessage }}</div>
             </div>
           </template>
@@ -133,7 +135,7 @@
     </el-card>
 
     <!-- Order Detail Drawer -->
-    <el-drawer v-model="detailVisible" direction="rtl" size="800px" title="订单详情" @close="orderDetail = null">
+    <el-drawer v-model="detailVisible" direction="rtl" size="1000px" title="订单详情" @close="orderDetail = null">
       <template v-if="orderDetail">
         <el-tabs v-model="activeTab">
           <el-tab-pane label="订单信息" name="info">
@@ -145,9 +147,10 @@
                   <el-tag :type="statusType(orderDetail.orderStatus)" size="small">{{ statusLabel(orderDetail.orderStatus) }}</el-tag>
                 </el-descriptions-item>
                 <el-descriptions-item label="订单备注">{{ orderDetail.buyerMessage || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="配送时间">{{ orderDetail.deliveryTime || '-' }}</el-descriptions-item>
                 <el-descriptions-item label="收货人姓名">{{ orderDetail.receiver?.receiver || '-' }}</el-descriptions-item>
                 <el-descriptions-item label="收货人电话">{{ orderDetail.receiver?.contact || '-' }}</el-descriptions-item>
-                <el-descriptions-item label="收货地址">{{ orderDetail.receiver?.fullLocation || orderDetail.receiver?.address || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="收货地址">{{ (orderDetail.receiver?.fullLocation || '') + ' ' + (orderDetail.receiver?.address || '') || '-' }}</el-descriptions-item>
               </el-descriptions>
             </el-card>
             <el-card shadow="never" class="detail-card" style="margin-top:12px">
@@ -179,7 +182,13 @@
               <el-table-column label="现价" width="80">
                 <template #default="{ row: sku }"><span style="color:#f56c6c">¥{{ sku.price }}</span></template>
               </el-table-column>
+              <el-table-column label="成本价" width="85">
+                <template #default="{ row: sku }"><span style="color:#909399">¥{{ sku.costPrice ?? '0.00' }}</span></template>
+              </el-table-column>
               <el-table-column label="数量" width="60" prop="quantity" align="center" />
+              <el-table-column label="毛利" width="85">
+                <template #default="{ row: sku }"><span :style="{color: (sku.profitMoney ?? 0) >= 0 ? '#67c23a' : '#f56c6c', fontWeight:'600'}">¥{{ sku.profitMoney ?? '0.00' }}</span></template>
+              </el-table-column>
               <el-table-column label="总价" width="85">
                 <template #default="{ row: sku }"><span style="font-weight:600">¥{{ (sku.price * sku.quantity).toFixed(2) }}</span></template>
               </el-table-column>
@@ -191,7 +200,7 @@
             <div class="timeline">
               <div v-for="(step, idx) in computedTimeline" :key="idx" class="timeline-item">
                 <div class="timeline-left">
-                  <div class="timeline-node" :class="{ active: idx === 0 }" />
+                  <div class="timeline-node" :class="{ active: step.done }" />
                 </div>
                 <div class="timeline-content">
                   <div class="timeline-time">{{ step.time }}</div>
@@ -313,10 +322,11 @@ const flatSkuList = computed(() => {
 const computedTimeline = computed(() => {
   if (!orderDetail.value) return []
   const steps: { time: string; desc: string }[] = []
-  steps.push({ time: orderDetail.value.createTime, desc: '创建订单' })
-  if (orderDetail.value.orderStatus >= 2) steps.push({ time: orderDetail.value.modifyTime, desc: '商家发货' })
-  if (orderDetail.value.orderStatus >= 3) steps.push({ time: orderDetail.value.modifyTime, desc: '客户收货' })
-  if (orderDetail.value.orderStatus === 5) steps.push({ time: orderDetail.value.modifyTime, desc: '订单取消' })
+  steps.push({ time: orderDetail.value.createTime, desc: '创建订单', done: true })
+  if (orderDetail.value.orderStatus >= 2) steps.push({ time: orderDetail.value.modifyTime, desc: '商家发货', done: orderDetail.value.orderStatus >= 3 || orderDetail.value.orderStatus === 5 })
+  if (orderDetail.value.orderStatus >= 3 && orderDetail.value.orderStatus !== 5) steps.push({ time: orderDetail.value.modifyTime, desc: '客户收货', done: orderDetail.value.orderStatus >= 4 || orderDetail.value.orderStatus === 5 })
+  if (orderDetail.value.orderStatus === 5) steps.push({ time: orderDetail.value.modifyTime, desc: '订单取消', done: false })
+  if (orderDetail.value.orderStatus !== 5 && steps.length > 0) steps[steps.length - 1].done = false
   return steps
 })
 

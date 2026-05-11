@@ -8,7 +8,7 @@
         </el-button>
       </div>
 
-      <el-table :data="tableData" border v-loading="loading" style="width: 100%" row-key="id">
+      <el-table :data="tableData" border v-loading="loading" style="width: 100%" row-key="id" @expand-change="onExpandChange">
         <el-table-column type="expand">
           <template #default="{ row }">
             <div class="expand-content">
@@ -19,7 +19,12 @@
                   添加规格
                 </el-button>
               </div>
-              <el-table :data="row.specs || []" border size="small" style="width: 100%">
+              <el-table :data="row.specs || []" border size="small" style="width: 100%" row-key="id" :class="`spec-table-${row.id}`">
+                <el-table-column label="" width="50">
+                  <template #default>
+                    <el-icon class="drag-handle" style="cursor:grab"><Rank /></el-icon>
+                  </template>
+                </el-table-column>
                 <el-table-column prop="name" label="规格名称" min-width="150" />
                 <el-table-column label="类型" width="120">
                   <template #default="{ row: spec }">
@@ -183,11 +188,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { getTypes, createType, updateType, deleteType, createSpec, updateSpec, deleteSpec } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Plus, Edit, Delete } from '@element-plus/icons-vue'
+import { Plus, Edit, Delete, Rank } from '@element-plus/icons-vue'
+import Sortable from 'sortablejs'
 
 const router = useRouter()
 const loading = ref(false)
@@ -394,6 +400,38 @@ function canDeleteSpec(typeRow, spec) {
 
 function isOptionUsed(value: string) {
   return specForm._usedOptions.includes(value)
+}
+
+const specSortables = new Map<string, any>()
+
+function onExpandChange(row: any, expandedRows: any[]) {
+  if (!expandedRows.includes(row)) {
+    // Row collapsed — destroy sortable if exists
+    const s = specSortables.get(row.id)
+    if (s) { s.destroy(); specSortables.delete(row.id) }
+    return
+  }
+  // Row expanded — init Sortable after DOM renders
+  nextTick(() => {
+    const el = document.querySelector(`.spec-table-${row.id} .el-table__body-wrapper tbody`)
+    if (!el || specSortables.has(row.id)) return
+    const sortable = Sortable.create(el as HTMLElement, {
+      handle: '.drag-handle',
+      animation: 200,
+      onEnd: async (evt) => {
+        const { oldIndex, newIndex } = evt
+        if (oldIndex === undefined || newIndex === undefined || oldIndex === newIndex) return
+        const arr = [...(row.specs || [])]
+        const moved = arr.splice(oldIndex, 1)[0]
+        arr.splice(newIndex, 0, moved)
+        row.specs = arr
+        for (let i = 0; i < arr.length; i++) {
+          await updateSpec(arr[i].id, { ...arr[i], productType: row.id, sort: i })
+        }
+      },
+    })
+    specSortables.set(row.id, sortable)
+  })
 }
 
 async function loadData() {

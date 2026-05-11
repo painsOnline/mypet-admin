@@ -37,6 +37,12 @@
       <template #header><h3>订单金额趋势图</h3></template>
       <v-chart :option="amountOption" style="height:360px" autoresize />
     </el-card>
+
+    <!-- Profit Trend -->
+    <el-card class="chart-card" style="margin-top:16px">
+      <template #header><h3>毛利润趋势图</h3></template>
+      <v-chart :option="profitOption" style="height:360px" autoresize />
+    </el-card>
   </div>
 </template>
 
@@ -156,6 +162,25 @@ const amountOption = computed(() => ({
     smooth: true,
     areaStyle: { opacity: 0.15 },
     itemStyle: { color: '#67C23A' },
+  }],
+}))
+
+const profitOption = computed(() => ({
+  tooltip: { trigger: 'axis', valueFormatter: (val: any) => '¥' + (Number(val) || 0).toFixed(2) },
+  grid: { left: 80, right: 30, top: 30, bottom: 40, containLabel: true },
+  xAxis: {
+    type: 'category',
+    data: trendData.value.map((p: any) => p.dateKey),
+    axisLabel: { rotate: trendData.value.length > 31 ? 45 : 0 },
+  },
+  yAxis: { type: 'value', name: '利润(元)' },
+  series: [{
+    name: '毛利润',
+    type: 'line',
+    data: trendData.value.map((p: any) => p.profitAmount || 0),
+    smooth: true,
+    areaStyle: { opacity: 0.15 },
+    itemStyle: { color: '#E6A23C' },
   }],
 }))
 
