@@ -152,6 +152,10 @@ function handleLogout() {
   background-color: #304156;
   overflow-y: auto;
   height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 10;
   .logo {
     padding: 20px 12px;
     h2 {
@@ -171,4 +175,5 @@ function handleLogout() {
 .header-left .shop-name { font-size: 16px; font-weight: 600; }
 .header-right { display: flex; align-items: center; gap: 12px; }
 .shop-name { font-size: 16px; font-weight: 600; }
+:deep(.el-container) { margin-left: 220px; }
 </style>

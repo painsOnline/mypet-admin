@@ -39,13 +39,9 @@
         <el-form-item label="排序">
           <el-input-number v-model="form.sort" :min="0" style="width:120px" />
         </el-form-item>
-        <el-form-item label="商品主图">
-          <ImageUploader v-model="form.picture" />
-          <div class="form-hint">仅一张，用于商品列表展示</div>
-        </el-form-item>
-        <el-form-item label="商品轮播图">
+        <el-form-item label="商品图片">
           <ImageUploader v-model="form.mainPictures" />
-          <div class="form-hint">可上传多张图片，用于商品详情页轮播展示</div>
+          <div class="form-hint">第一张为主图，可拖拽图片排序</div>
         </el-form-item>
 
         <!-- 商品属性 -->
@@ -198,6 +194,10 @@ function removeProperty(idx) {
 async function handleSubmit() {
   const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
+  if (!form.mainPictures || form.mainPictures.length === 0) {
+    ElMessage.warning('请至少上传一张商品图片')
+    return
+  }
 
   submitLoading.value = true
   try {
@@ -210,7 +210,7 @@ async function handleSubmit() {
       price: form.price,
       oldPrice: form.oldPrice,
       mainPictures: form.mainPictures,
-      picture: form.picture || '',
+      picture: form.mainPictures && form.mainPictures.length > 0 ? form.mainPictures[0] : '',
       detail: form.detail,
       sort: form.sort,
       skus: form.skus,
