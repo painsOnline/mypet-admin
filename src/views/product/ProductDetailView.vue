@@ -356,9 +356,15 @@ h3 {
 }
 
 .form-footer {
-  margin-top: 24px;
-  padding-top: 16px;
+  position: fixed;
+  bottom: 0;
+  left: 220px;
+  right: 0;
+  background: #fff;
+  z-index: 10;
+  padding: 12px 24px;
   border-top: 1px solid #ebeef5;
   text-align: center;
+  box-shadow: 0 -2px 8px rgba(0,0,0,.06);
 }
 </style>
