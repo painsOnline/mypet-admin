@@ -167,3 +167,12 @@ export function getHotProducts() {
 export function saveHotProducts(data) {
   return request({ url: '/admin/hot/sort', method: 'put', data })
 }
+
+// ---- Jieshun Import ----
+export function jieshunSearch(data) {
+  return request({ url: '/admin/jieshun/search', method: 'post', data })
+}
+
+export function jieshunDetail(data) {
+  return request({ url: '/admin/jieshun/detail', method: 'post', data })
+}

@@ -66,6 +66,7 @@
         <table class="sku-table">
           <thead>
             <tr>
+              <th v-if="jieshunProduct" style="width:90px">街顺导入</th>
               <th v-for="spec in activeSpecs" :key="spec.id">{{ spec.name }}</th>
               <th>SKU图片</th>
               <th>价格</th>
@@ -77,6 +78,9 @@
           </thead>
           <tbody>
             <tr v-for="(sku, si) in localSkus" :key="si" :class="{ 'sku-active': isSkuActive(sku) }">
+              <td v-if="jieshunProduct">
+                <el-button size="small" type="success" plain @click="openSkuDrawer(si)">从街顺导入</el-button>
+              </td>
               <td v-for="spec in activeSpecs" :key="spec.id">{{ sku.specMap[spec.name] }}</td>
               <td>
                 <ImageUploader v-model="localSkus[si].picture" />
@@ -110,6 +114,37 @@
       </div>
       <p class="sku-hint">填写价格、成本价、库存即表示该SKU有效；条形码为选填。整行留空则该SKU无效，不会被保存。</p>
     </template>
+
+    <!-- 街顺SKU导入抽屉 -->
+    <el-drawer v-if="jieshunProduct" v-model="skuDrawerVisible" title="从街顺导入SKU" direction="rtl" size="750px">
+      <div v-if="jieshunProduct && jieshunProduct.skus" style="padding:0 20px">
+        <el-table :data="jieshunProduct.skus" size="small" highlight-current-row
+          @current-change="onJieshunSkuSelect" ref="jieshunSkuTableRef" max-height="500">
+          <el-table-column label="选择" width="55">
+            <template #default="{ row }">
+              <el-radio v-model="jieshunSelectedSkuId" :value="row.id" />
+            </template>
+          </el-table-column>
+          <el-table-column prop="name" label="SKU名称" min-width="140" show-overflow-tooltip />
+          <el-table-column label="零售价" width="90">
+            <template #default="{ row }">¥{{ row.retail_price }}</template>
+          </el-table-column>
+          <el-table-column label="原价(+20%)" width="100">
+            <template #default="{ row }">¥{{ (Number(row.retail_price || 0) * 1.2).toFixed(2) }}</template>
+          </el-table-column>
+          <el-table-column label="成本价" width="90">
+            <template #default="{ row }">¥{{ row.purchase_price }}</template>
+          </el-table-column>
+          <el-table-column prop="upc" label="条形码" width="140" show-overflow-tooltip />
+        </el-table>
+      </div>
+      <template #footer>
+        <el-button @click="skuDrawerVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="!jieshunSelectedSkuId" @click="applyJieshunSku">
+          确认导入到当前SKU
+        </el-button>
+      </template>
+    </el-drawer>
   </div>
 </template>
 
@@ -123,6 +158,7 @@ import request from '@/api/request'
 const props = defineProps({
   specs: { type: Array, default: () => [] },
   skus: { type: Array, default: () => [] },
+  jieshunProduct: { type: Object, default: null },
 })
 const emit = defineEmits(['update:skus', 'update:specs'])
 
@@ -300,6 +336,55 @@ function cartesianProduct(arrays: any[][]) {
 
 const localSkus: any[] = reactive([])
 
+// --- 街顺SKU导入 ---
+const skuDrawerVisible = ref(false)
+const jieshunSelectedSkuId = ref(null)
+const jieshunSkuTableRef = ref(null)
+const skuDrawerTargetIndex = ref(-1)
+
+function openSkuDrawer(skuIndex: number) {
+  skuDrawerTargetIndex.value = skuIndex
+  jieshunSelectedSkuId.value = null
+  skuDrawerVisible.value = true
+}
+
+function onJieshunSkuSelect(row: any) {
+  if (row) jieshunSelectedSkuId.value = row.id
+}
+
+function applyJieshunSku() {
+  if (!jieshunSelectedSkuId.value || skuDrawerTargetIndex.value < 0) return
+  if (!props.jieshunProduct || !props.jieshunProduct.skus) return
+
+  const selectedSku = (props.jieshunProduct.skus as any[]).find(
+    (s: any) => s.id === jieshunSelectedSkuId.value
+  )
+  if (!selectedSku) return
+
+  // Check barcode uniqueness across all local SKUs (except the target)
+  const newBarcode = selectedSku.upc || ''
+  if (newBarcode) {
+    const conflict = localSkus.find((s, i) => i !== skuDrawerTargetIndex.value && s.barcode === newBarcode)
+    if (conflict) {
+      ElMessage.warning(`条形码 ${newBarcode} 已被其他SKU使用，请选择其他SKU`)
+      return
+    }
+  }
+
+  const target = localSkus[skuDrawerTargetIndex.value]
+  if (!target) return
+
+  const retailPrice = Number(selectedSku.retail_price || 0)
+  target.price = retailPrice
+  target.oldPrice = Math.round(retailPrice * 1.2 * 100) / 100
+  target.costPrice = Number(selectedSku.purchase_price || 0)
+  target.barcode = newBarcode
+  target.inventory = 0
+
+  skuDrawerVisible.value = false
+  ElMessage.success('SKU信息已从街顺导入')
+}
+
 // Pre-select only values that appear in backend SKU data (edit mode)
 function applySkuSelection(skuList: any[]) {
   const usedValues: Record<string, Set<string>> = {}
@@ -380,6 +465,19 @@ async function syncSpecToBackend(spec: any) {
 function isSkuActive(sku: any) {
   return !!(sku.picture || (sku.price && sku.price > 0) || (sku.oldPrice && sku.oldPrice > 0) || (sku.inventory && sku.inventory > 0))
 }
+
+// Clear SKU fields when a new jieshun product is fetched (re-search)
+watch(() => props.jieshunProduct, (newVal) => {
+  if (newVal) {
+    localSkus.forEach((sku: any) => {
+      sku.price = 0
+      sku.oldPrice = 0
+      sku.costPrice = 0
+      sku.barcode = ''
+      sku.inventory = 0
+    })
+  }
+})
 
 // Emit valid SKUs on change
 let lastEmittedJson = ''
