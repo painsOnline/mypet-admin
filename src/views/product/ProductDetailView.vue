@@ -51,7 +51,12 @@
 
         <!-- 商品属性 -->
         <template v-if="displaySpecs.length > 0 || properties.length > 0">
-          <h4 class="section-title">商品属性</h4>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <h4 class="section-title" style="border:none;margin:0;padding:0">商品属性</h4>
+            <el-button v-if="jieshunFetchedProduct" size="small" type="success" @click="jieshunMatchPanelVisible = !jieshunMatchPanelVisible">
+              从街顺匹配属性
+            </el-button>
+          </div>
           <div v-if="availableSpecs.length > 0" class="property-add-bar">
             <span class="property-add-label">添加属性：</span>
             <el-button v-for="spec in availableSpecs" :key="spec.id" size="small" @click="addProperty(spec)">
@@ -77,7 +82,7 @@
 
         <!-- SKU管理 -->
         <h4 class="section-title">SKU管理</h4>
-        <SkuEditor v-model:skus="form.skus" :specs="skuSpecs" :jieshun-product="jieshunFetchedProduct" />
+        <SkuEditor v-model:skus="form.skus" :specs="skuSpecs" :jieshun-product="jieshunFetchedProduct" :product-pictures="form.mainPictures" />
 
         <!-- 商品详情 -->
         <h4 class="section-title">商品详情</h4>
@@ -131,9 +136,9 @@
               <el-radio v-model="jieshunSelectedId" :value="row.id" />
             </template>
           </el-table-column>
-          <el-table-column label="商品主图" width="80">
+          <el-table-column label="商品主图" width="120">
             <template #default="{ row }">
-              <img :src="row.cover_img" style="width:60px;height:60px;object-fit:cover;border-radius:4px" />
+              <img :src="row.cover_img" style="width:100px;height:100px;object-fit:cover;border-radius:4px" />
             </template>
           </el-table-column>
           <el-table-column prop="name" label="商品名称" min-width="220" show-overflow-tooltip />
@@ -155,6 +160,39 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 街顺属性匹配侧边栏 -->
+    <div v-if="jieshunFetchedProduct && jieshunMatchPanelVisible" class="jieshun-match-panel">
+      <div class="jieshun-match-toggle" @click="jieshunMatchPanelVisible = false">
+        <el-icon :size="18"><DArrowRight /></el-icon>
+      </div>
+      <div class="jieshun-match-header">
+        <span>街顺属性匹配</span>
+        <el-button size="small" type="primary" @click="matchJieshunAttrs">执行匹配</el-button>
+      </div>
+      <div class="jieshun-match-body">
+        <el-table :data="jieshunMatchList" size="small" style="width:100%">
+          <el-table-column label="序号" type="index" width="55" />
+          <el-table-column prop="attr_name" label="属性名称" min-width="120" show-overflow-tooltip />
+          <el-table-column label="属性值" min-width="200">
+            <template #default="{ row }">
+              <el-tooltip :content="row.rawJson" placement="top" :show-after="300">
+                <div style="display:inline-flex;flex-wrap:wrap;gap:2px;cursor:default">
+                  <el-tag v-for="(v,i) in (row.value||[])" :key="i" size="small">{{ v }}</el-tag>
+                </div>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <el-table-column label="是否匹配" width="80" align="center">
+            <template #default="{ row }">
+              <el-icon v-if="row.matched" color="#67C23A" :size="20"><SuccessFilled /></el-icon>
+              <el-icon v-else-if="row.nameMatched" color="#E6A23C" :size="20"><WarningFilled /></el-icon>
+              <el-icon v-else color="#F56C6C" :size="20"><CircleCloseFilled /></el-icon>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -163,7 +201,7 @@ import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { getProductDetail, createProduct, updateProduct, getCategories, getTypes, getBrands, jieshunSearch, jieshunDetail } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Delete, Download } from '@element-plus/icons-vue'
+import { Plus, Delete, Download, DArrowRight, SuccessFilled, CircleCloseFilled, WarningFilled } from '@element-plus/icons-vue'
 import ImageUploader from '@/components/ImageUploader.vue'
 import SkuEditor from '@/components/SkuEditor.vue'
 import RichTextEditor from '@/components/RichTextEditor.vue'
@@ -232,6 +270,8 @@ const jieshunDetailLoading = ref(false)
 const jieshunTableRef = ref(null)
 // Holds the full fetched product (with SKUs) for later SKU-level import
 const jieshunFetchedProduct = ref(null)
+const jieshunMatchPanelVisible = ref(false)
+const jieshunMatchList = ref<any[]>([])
 
 function getJieshunCachedToken() {
   const stored = localStorage.getItem(JIESHUN_TOKEN_KEY)
@@ -327,6 +367,8 @@ async function jieshunFetchDetail() {
 
     // Store full product for SKU-level import
     jieshunFetchedProduct.value = data
+    jieshunMatchPanelVisible.value = false
+    jieshunMatchList.value = []
 
     // Fill product form
     const product = data
@@ -413,6 +455,58 @@ function addProperty(spec) {
 
 function removeProperty(idx) {
   properties.splice(idx, 1)
+}
+
+function matchJieshunAttrs() {
+  if (!jieshunFetchedProduct.value) return
+  const attrs = jieshunFetchedProduct.value.dynamic_attrs
+  if (!attrs || !Array.isArray(attrs)) {
+    ElMessage.info('街顺商品没有可匹配的属性')
+    return
+  }
+  let autoAdded = 0
+  let matchedCount = 0
+  const list: any[] = []
+
+  attrs.forEach((a: any) => {
+    if (!a.attr_name) return
+    const values = (a.value && Array.isArray(a.value)) ? a.value.map((v: any) => typeof v === 'object' ? String(v.value || '') : String(v)) : []
+    const rawJson = JSON.stringify(a)
+    // Find matching display spec by name
+    const spec = displaySpecs.value.find((s: any) => s.name === a.attr_name)
+    if (!spec) {
+      list.push({ attr_name: a.attr_name, value: values, matched: false, nameMatched: false, rawJson })
+      return
+    }
+    // Auto-add property if not already present
+    let prop = (properties as any[]).find((p: any) => p.name === a.attr_name)
+    if (!prop) {
+      addProperty(spec)
+      prop = (properties as any[]).find((p: any) => p.name === a.attr_name)
+      if (prop) autoAdded++
+    }
+    if (!prop) { list.push({ attr_name: a.attr_name, value: values, matched: false, nameMatched: true, rawJson }); return }
+    // Match values
+    const localOptions: string[] = spec.inputOptions || []
+    let matched = false
+    if (spec.inputType === 1) {
+      prop.value = values.join(',')
+      matched = true
+    } else if (spec.inputType === 2) {
+      const m = values.find((v: string) => localOptions.includes(v))
+      if (m) { prop.value = m; matched = true }
+    } else if (spec.inputType === 3) {
+      const matches = values.filter((v: string) => localOptions.includes(v))
+      if (matches.length > 0) { prop.value = matches; matched = true }
+    }
+    if (matched) matchedCount++
+    list.push({ attr_name: a.attr_name, value: values, matched, nameMatched: true, rawJson })
+  })
+
+  jieshunMatchList.value = list
+  jieshunMatchPanelVisible.value = true
+  const msg = autoAdded > 0 ? `自动添加了 ${autoAdded} 个属性，匹配了 ${matchedCount} 个属性值` : `匹配了 ${matchedCount} 个属性值`
+  ElMessage.success(msg)
 }
 
 async function handleSubmit() {
@@ -596,5 +690,48 @@ h3 {
   border-top: 1px solid #ebeef5;
   text-align: center;
   box-shadow: 0 -2px 8px rgba(0,0,0,.06);
+}
+
+// 街顺属性匹配侧边栏
+.jieshun-match-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 33.33%;
+  height: 100vh;
+  background: #fff;
+  box-shadow: -2px 0 12px rgba(0,0,0,.12);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+.jieshun-match-toggle {
+  position: absolute;
+  left: -28px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 60px;
+  background: #409EFF;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px 0 0 6px;
+  cursor: pointer;
+}
+.jieshun-match-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #ebeef5;
+  font-size: 15px;
+  font-weight: 600;
+}
+.jieshun-match-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
 }
 </style>

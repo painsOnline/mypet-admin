@@ -66,6 +66,7 @@
         <table class="sku-table">
           <thead>
             <tr>
+              <th style="width:40px"></th>
               <th v-if="jieshunProduct" style="width:90px">街顺导入</th>
               <th v-for="spec in activeSpecs" :key="spec.id">{{ spec.name }}</th>
               <th>SKU图片</th>
@@ -76,14 +77,38 @@
               <th>条形码</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody ref="skuTableBodyRef">
             <tr v-for="(sku, si) in localSkus" :key="si" :class="{ 'sku-active': isSkuActive(sku) }">
+              <td><el-icon class="drag-handle-sku" style="cursor:grab"><Rank /></el-icon></td>
               <td v-if="jieshunProduct">
                 <el-button size="small" type="success" plain @click="openSkuDrawer(si)">从街顺导入</el-button>
               </td>
               <td v-for="spec in activeSpecs" :key="spec.id">{{ sku.specMap[spec.name] }}</td>
-              <td>
-                <ImageUploader v-model="localSkus[si].picture" />
+              <td style="text-align:center">
+                <div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;width:130px">
+                  <!-- Show image if exists, otherwise show upload zone -->
+                  <div v-if="localSkus[si].picture" style="position:relative;width:130px;height:130px;border-radius:6px;overflow:hidden;border:1px solid #dcdfe6">
+                    <img :src="localSkus[si].picture" style="width:130px;height:130px;object-fit:cover" />
+                    <div style="position:absolute;top:4px;right:4px">
+                      <el-button type="danger" :icon="Delete" circle size="small" @click="localSkus[si].picture = ''" />
+                    </div>
+                  </div>
+                  <el-upload v-else class="sku-drop" drag :show-file-list="false" :http-request="(opt:any) => uploadSkuImage(opt, si)" accept=".jpg,.jpeg,.png,.gif,.webp,.bmp">
+                    <el-icon :size="28"><Plus /></el-icon>
+                    <div class="upload-text-sku">拖拽或点击上传</div>
+                  </el-upload>
+                  <el-popover v-if="productPictures.length" placement="bottom" :width="500" trigger="click">
+                    <template #reference>
+                      <el-button size="small" type="primary" plain>从商品图片选择</el-button>
+                    </template>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px">
+                      <img v-for="(pic,i) in productPictures" :key="i" :src="pic"
+                        style="width:110px;height:110px;object-fit:cover;border-radius:4px;cursor:pointer;border:2px solid transparent"
+                        :style="{ borderColor: localSkus[si].picture === pic ? '#409EFF' : 'transparent' }"
+                        @click="localSkus[si].picture = pic" />
+                    </div>
+                  </el-popover>
+                </div>
               </td>
               <td>
                 <el-input-number v-model="localSkus[si].price" :min="0" :precision="2" size="small"
@@ -149,16 +174,17 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, watch, computed, onMounted, ref } from 'vue'
-import { Close, Plus, Check } from '@element-plus/icons-vue'
+import { reactive, watch, computed, onMounted, ref, nextTick } from 'vue'
+import { Close, Plus, Check, Rank, Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import ImageUploader from '@/components/ImageUploader.vue'
 import request from '@/api/request'
+import Sortable from 'sortablejs'
 
 const props = defineProps({
   specs: { type: Array, default: () => [] },
   skus: { type: Array, default: () => [] },
   jieshunProduct: { type: Object, default: null },
+  productPictures: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['update:skus', 'update:specs'])
 
@@ -335,6 +361,27 @@ function cartesianProduct(arrays: any[][]) {
 // ---- SKU data ----
 
 const localSkus: any[] = reactive([])
+const skuTableBodyRef = ref(null)
+
+let skuSortable: any = null
+function initSkuSortable() {
+  nextTick(() => {
+    if (skuSortable) { skuSortable.destroy(); skuSortable = null }
+    const el = skuTableBodyRef.value
+    if (!el || localSkus.length === 0) return
+    skuSortable = Sortable.create(el as HTMLElement, {
+      handle: '.drag-handle-sku', animation: 200,
+      onEnd: (evt: any) => {
+        const { oldIndex, newIndex } = evt
+        if (oldIndex === undefined || newIndex === undefined || oldIndex === newIndex) return
+        const moved = localSkus.splice(oldIndex, 1)[0]
+        localSkus.splice(newIndex, 0, moved)
+      },
+    })
+  })
+}
+
+watch(() => localSkus.length, () => { initSkuSortable() })
 
 // --- 街顺SKU导入 ---
 const skuDrawerVisible = ref(false)
@@ -381,6 +428,18 @@ function applyJieshunSku() {
   target.barcode = newBarcode
   target.inventory = 0
 
+  // For unique-value specs (inputType=1), set the value to the imported SKU name
+  const jieshunSkuName = selectedSku.name || ''
+  if (jieshunSkuName && target.specs) {
+    ;(target.specs as any[]).forEach((sp: any) => {
+      const specDef = skuSpecs.value.find((s: any) => s.name === sp.name)
+      if (specDef && specDef.inputType === 1) {
+        sp.valueName = jieshunSkuName
+        if (target.specMap) target.specMap[sp.name] = jieshunSkuName
+      }
+    })
+  }
+
   skuDrawerVisible.value = false
   ElMessage.success('SKU信息已从街顺导入')
 }
@@ -415,27 +474,16 @@ function applySkuSelection(skuList: any[]) {
 
 function mergeSkus(skuList: any[]) {
   if (!skuList || skuList.length === 0) return
-  if (skuSpecs.value.length === 0) return
 
-  // Merge specific values into generated combinations
-  for (const backendSku of skuList) {
-    const specMap: Record<string, string> = {}
-    if (backendSku.specs) {
-      (backendSku.specs as any[]).forEach((sp: any) => { specMap[sp.name] = sp.valueName || sp.valueName })
-    }
-    const key = skuSpecs.value.map((s: any) => specMap[s.name] || '').join('||')
-    for (let i = 0; i < localSkus.length; i++) {
-      const localKey = skuSpecs.value.map((s: any) => localSkus[i].specMap[s.name] || '').join('||')
-      if (localKey === key) {
-        localSkus[i].price = backendSku.price || 0
-        localSkus[i].oldPrice = backendSku.oldPrice || 0
-        localSkus[i].costPrice = backendSku.costPrice || 0
-        localSkus[i].inventory = backendSku.inventory || 0
-        localSkus[i].barcode = backendSku.barcode || ''
-        localSkus[i].picture = backendSku.picture || ''
-        break
-      }
-    }
+  // Merge from backend SKU data into local SKUs by index
+  for (let i = 0; i < Math.min(skuList.length, localSkus.length); i++) {
+    const bs = skuList[i]
+    localSkus[i].price = bs.price || 0
+    localSkus[i].oldPrice = bs.oldPrice || 0
+    localSkus[i].costPrice = bs.costPrice || 0
+    localSkus[i].inventory = bs.inventory || 0
+    localSkus[i].barcode = bs.barcode || ''
+    localSkus[i].picture = bs.picture || ''
   }
 }
 
@@ -464,6 +512,21 @@ async function syncSpecToBackend(spec: any) {
 
 function isSkuActive(sku: any) {
   return !!(sku.picture || (sku.price && sku.price > 0) || (sku.oldPrice && sku.oldPrice > 0) || (sku.inventory && sku.inventory > 0))
+}
+
+async function uploadSkuImage(opt: any, si: number) {
+  const formData = new FormData()
+  formData.append('file', opt.file)
+  try {
+    const url = await request({
+      url: '/admin/upload/image',
+      method: 'post',
+      data: formData,
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    localSkus[si].picture = url as string
+    ElMessage.success('上传成功')
+  } catch { ElMessage.error('上传失败') }
 }
 
 // Clear SKU fields when a new jieshun product is fetched (re-search)
@@ -545,4 +608,8 @@ watch(localSkus, () => {
 .is-error :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px #f56c6c inset; }
 
 .sku-hint { margin-top: 10px; font-size: 12px; color: #909399; }
+.sku-drop { width: 130px; }
+.sku-drop :deep(.el-upload) { width: 130px; }
+.sku-drop :deep(.el-upload-dragger) { width: 130px; height: 130px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0; }
+.upload-text-sku { font-size: 11px; color: #909399; margin-top: 2px; }
 </style>

@@ -16,7 +16,10 @@
         <span class="toolbar-hint">全局属性对所有商品类型生效；共享属性可被商品类型引用</span>
       </div>
 
-      <el-table :data="tableData" border v-loading="loading" style="width:100%">
+      <el-table :data="tableData" border v-loading="loading" style="width:100%" row-key="id" class="specs-table">
+        <el-table-column label="" width="50">
+          <template #default><el-icon class="drag-handle" style="cursor:grab"><Rank /></el-icon></template>
+        </el-table-column>
         <el-table-column label="属性名称" min-width="150">
           <template #default="{ row }">
             <div>{{ row.name }}</div>
@@ -63,7 +66,8 @@
     </el-card>
 
     <!-- Edit Dialog -->
-    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="550px" @close="resetForm">
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="650px" @close="resetForm">
+      <div style="max-height:60vh;overflow-y:auto;padding-right:8px">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
         <el-form-item label="属性名称" prop="name">
           <el-input v-model="form.name" placeholder="请输入属性名称" />
@@ -101,6 +105,7 @@
           <el-input v-model="form.desc" placeholder="可选" />
         </el-form-item>
       </el-form>
+      </div>
       <template #footer>
         <el-button @click="dialogVisible=false">取消</el-button>
         <el-button type="primary" :loading="submitLoading" @click="handleSubmit">确定</el-button>
@@ -110,10 +115,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { getSpecsByScope, createSpec, updateSpec, deleteSpec } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Plus, Edit, Delete, ArrowDown } from '@element-plus/icons-vue'
+import { Plus, Edit, Delete, ArrowDown, Rank } from '@element-plus/icons-vue'
+import Sortable from 'sortablejs'
 
 const loading = ref(false)
 const tableData = ref<any[]>([])
@@ -128,6 +134,7 @@ async function loadData() {
     ])
     const all = [...(globalSpecs||[]), ...(sharedSpecs||[])]
     tableData.value = all
+    initSortable()
   } catch { /* handled */ }
   finally { loading.value = false }
 }
@@ -244,7 +251,38 @@ async function handleDelete(row: any) {
 function scopeTag(v: number) { return v===0?'danger':v===1?'warning':'info' }
 function scopeLabel(v: number) { return v===0?'全局':v===1?'共享':'私有' }
 
-onMounted(() => loadData())
+let specSortable: any = null
+
+function initSortable() {
+  nextTick(() => {
+    const el = document.querySelector('.specs-table .el-table__body-wrapper tbody')
+    if (!el) return
+    if (specSortable) specSortable.destroy()
+    specSortable = Sortable.create(el as HTMLElement, {
+      handle: '.drag-handle', animation: 200,
+      onEnd: async (evt: any) => {
+        const { oldIndex, newIndex } = evt
+        if (oldIndex === undefined || newIndex === undefined || oldIndex === newIndex) return
+        const arr = [...tableData.value]
+        const moved = arr.splice(oldIndex, 1)[0]
+        arr.splice(newIndex, 0, moved)
+        tableData.value = arr
+        // Batch update sort order
+        for (let i = 0; i < arr.length; i++) {
+          if (arr[i].sort !== i) {
+            arr[i].sort = i
+            await updateSpec(arr[i].id, { ...arr[i], sort: i, type: arr[i].type, inputType: arr[i].inputType, inputOptions: arr[i].inputOptions })
+          }
+        }
+      },
+    })
+  })
+}
+
+onMounted(async () => {
+  await loadData()
+  initSortable()
+})
 </script>
 
 <style lang="scss" scoped>

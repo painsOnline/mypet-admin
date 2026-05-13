@@ -156,6 +156,11 @@ function removeSingle() { emit('update:modelValue', '') }
   top: 4px; right: 4px;
 }
 
+.image-actions {
+  position: absolute;
+  top: 4px; right: 4px;
+}
+
 .main-badge {
   position: absolute;
   top: 4px; left: 4px;
