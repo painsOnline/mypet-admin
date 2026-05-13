@@ -12,63 +12,90 @@
         <el-table-column type="expand">
           <template #default="{ row }">
             <div class="expand-content">
-              <div class="expand-toolbar">
-                <span class="expand-title">规格列表</span>
-                <el-button type="primary" size="small" @click="handleOpenAddSpec(row)">
-                  <el-icon><Plus /></el-icon>
-                  添加规格
-                </el-button>
+              <!-- SKU列表 -->
+              <div class="spec-section">
+                <div class="spec-section-header">
+                  <span class="expand-title">SKU列表</span>
+                  <el-button type="primary" size="small" @click="handleOpenAddSku(row)">
+                    <el-icon><Plus /></el-icon>新增SKU
+                  </el-button>
+                </div>
+                <el-table :data="getSkuSpecs(row)" border size="small" style="width:100%" row-key="id" :class="`sku-table-${row.id}`">
+                  <el-table-column label="" width="50">
+                    <template #default><el-icon class="drag-handle" style="cursor:grab"><Rank /></el-icon></template>
+                  </el-table-column>
+                  <el-table-column prop="name" label="SKU名称" min-width="140" />
+                  <el-table-column label="输入类型" width="120">
+                    <template #default="{ row: spec }">{{ inputTypeLabel(spec.inputType) }}</template>
+                  </el-table-column>
+                  <el-table-column label="选项值" min-width="200">
+                    <template #default="{ row: spec }">
+                      <el-tag v-for="(opt,i) in (spec.inputOptions||[])" :key="i" size="small" style="margin:2px">{{ opt }}</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="sort" label="排序" width="70" />
+                  <el-table-column label="操作" width="140" fixed="right">
+                    <template #default="{ row: spec }">
+                      <el-button type="primary" size="small" @click="handleOpenEditSpec(spec,row)"><el-icon><Edit /></el-icon>编辑</el-button>
+                      <el-popconfirm v-if="canDeleteSkuSpec(row,spec)" title="确定删除？" @confirm="handleDeleteSpec(spec)">
+                        <template #reference>
+                          <el-button type="danger" size="small"><el-icon><Delete /></el-icon>删除</el-button>
+                        </template>
+                      </el-popconfirm>
+                    </template>
+                  </el-table-column>
+                </el-table>
               </div>
-              <el-table :data="row.specs || []" border size="small" style="width: 100%" row-key="id" :class="`spec-table-${row.id}`">
-                <el-table-column label="" width="50">
-                  <template #default>
-                    <el-icon class="drag-handle" style="cursor:grab"><Rank /></el-icon>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="name" label="规格名称" min-width="150" />
-                <el-table-column label="类型" width="120">
-                  <template #default="{ row: spec }">
-                    <el-tag :type="spec.type === 1 ? 'primary' : 'success'" size="small">
-                      {{ spec.type === 1 ? 'SKU规格' : '展示属性' }}
-                    </el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column label="输入类型" width="130">
-                  <template #default="{ row: spec }">
-                    <span>{{ inputTypeLabel(spec.inputType) }}</span>
-                  </template>
-                </el-table-column>
-                <el-table-column label="选项值" min-width="200">
-                  <template #default="{ row: spec }">
-                    <el-tag
-                      v-for="(opt, idx) in (spec.inputOptions || [])"
-                      :key="idx"
-                      size="small"
-                      style="margin-right: 4px; margin-bottom: 2px"
-                    >
-                      {{ opt }}
-                    </el-tag>
-                    <span v-if="!spec.inputOptions || spec.inputOptions.length === 0" style="color: #c0c4cc">暂无选项</span>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="sort" label="排序" width="80" />
-                <el-table-column label="操作" width="150" fixed="right">
-                  <template #default="{ row: spec }">
-                    <el-button type="primary" size="small" @click="handleOpenEditSpec(spec, row)">
-                      <el-icon><Edit /></el-icon>
-                      编辑
+
+              <!-- 属性列表 -->
+              <div class="spec-section" style="margin-top:16px">
+                <div class="spec-section-header">
+                  <span class="expand-title">属性列表</span>
+                  <el-dropdown @command="(cmd:string)=>handleAddProperty(cmd,row)">
+                    <el-button type="success" size="small">
+                      <el-icon><Plus /></el-icon>添加属性<el-icon class="el-icon--right"><ArrowDown /></el-icon>
                     </el-button>
-                    <el-popconfirm v-if="canDeleteSpec(row, spec)" title="确定删除该规格？" @confirm="handleDeleteSpec(spec)">
-                      <template #reference>
-                        <el-button type="danger" size="small">
-                          <el-icon><Delete /></el-icon>
-                          删除
-                        </el-button>
-                      </template>
-                    </el-popconfirm>
-                  </template>
-                </el-table-column>
-              </el-table>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item command="shared">引用共享属性</el-dropdown-item>
+                        <el-dropdown-item command="private">添加私有属性</el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                </div>
+                <el-table :data="getDisplaySpecs(row)" border size="small" style="width:100%" row-key="id" :class="`prop-table-${row.id}`">
+                  <el-table-column label="" width="50">
+                    <template #default><el-icon class="drag-handle" style="cursor:grab"><Rank /></el-icon></template>
+                  </el-table-column>
+                  <el-table-column prop="name" label="属性名称" min-width="140" />
+                  <el-table-column label="输入类型" width="120">
+                    <template #default="{ row: spec }">{{ inputTypeLabel(spec.inputType) }}</template>
+                  </el-table-column>
+                  <el-table-column label="属性值" min-width="180">
+                    <template #default="{ row: spec }">
+                      <el-tag v-for="(opt,i) in (spec.inputOptions||[])" :key="i" size="small" style="margin:2px">{{ opt }}</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="作用域" width="80">
+                    <template #default="{ row: spec }">
+                      <el-tag :type="spec.scope===0?'danger':spec.scope===1?'warning':'info'" size="small">
+                        {{ spec.scope===0?'全局':spec.scope===1?'共享':'私有' }}
+                      </el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="sort" label="排序" width="70" />
+                  <el-table-column label="操作" width="140" fixed="right">
+                    <template #default="{ row: spec }">
+                      <el-button type="primary" size="small" @click="handleOpenEditSpec(spec,row)"><el-icon><Edit /></el-icon>编辑</el-button>
+                      <el-popconfirm v-if="canDeletePropSpec(row,spec)" title="确定删除？" @confirm="handleDeleteSpec(spec)">
+                        <template #reference>
+                          <el-button type="danger" size="small"><el-icon><Delete /></el-icon>删除</el-button>
+                        </template>
+                      </el-popconfirm>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
             </div>
           </template>
         </el-table-column>
@@ -122,10 +149,37 @@
       </template>
     </el-dialog>
 
+    <!-- Shared Spec Reference Dialog -->
+    <el-dialog v-model="sharedSpecDialogVisible" title="引用共享属性" width="550px">
+      <el-table :data="sharedSpecList" size="small" highlight-current-row @current-change="(r:any)=>{if(r)sharedSpecSelectedId=r.id}">
+        <el-table-column label="选择" width="55">
+          <template #default="{row}"><el-radio v-model="sharedSpecSelectedId" :value="row.id"/></template>
+        </el-table-column>
+        <el-table-column label="属性名称" min-width="150">
+          <template #default="{row}">
+            <div>{{ row.name }}</div>
+            <div v-if="row.desc" style="color:#909399;font-size:12px">（{{ row.desc }}）</div>
+          </template>
+        </el-table-column>
+        <el-table-column label="输入类型" width="100">
+          <template #default="{row}">{{ inputTypeLabel(row.inputType) }}</template>
+        </el-table-column>
+        <el-table-column label="选项值" min-width="150">
+          <template #default="{row}">
+            <el-tag v-for="(o,i) in (row.inputOptions||[])" :key="i" size="small" style="margin:2px">{{o}}</el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="sharedSpecDialogVisible=false">取消</el-button>
+        <el-button type="primary" @click="confirmSharedSpec">确认引用</el-button>
+      </template>
+    </el-dialog>
+
     <!-- Spec Dialog -->
     <el-dialog
       v-model="specDialogVisible"
-      :title="specIsEdit ? '编辑规格' : '添加规格'"
+      :title="specDialogTitle"
       width="600px"
       @close="resetSpecForm"
     >
@@ -147,12 +201,10 @@
           </el-select>
         </el-form-item>
         <el-form-item label="选项值">
-          <!-- 唯一值: single text input -->
           <div v-if="specForm.inputType === 1" class="spec-options-editor">
             <el-input v-model="specForm._newOption" placeholder="请输入默认值" size="small" style="width:200px"
               @input="specForm.inputOptions = specForm._newOption ? [specForm._newOption] : []" />
           </div>
-          <!-- 单选/多选: tag-based multi-value editor -->
           <div v-else class="spec-options-editor">
             <el-tag
               v-for="(opt, idx) in specForm.inputOptions"
@@ -163,16 +215,15 @@
             >
               {{ opt }}
             </el-tag>
-            <div style="display: flex; gap: 4px">
-              <el-input
-                v-model="specForm._newOption"
-                placeholder="输入选项后按添加"
-                size="small"
-                style="width: 160px"
-                @keyup.enter="addSpecOption"
-              />
-              <el-button size="small" @click="addSpecOption">添加</el-button>
-            </div>
+            <el-input
+              v-model="specForm._batchOptions"
+              type="textarea"
+              :rows="4"
+              placeholder="每行一个值，或用中英文逗号分隔多个值"
+              style="width:100%"
+              @blur="parseBatchOptions"
+            />
+            <div class="form-hint">每行一个值，或用逗号分隔批量添加（支持中英文逗号）</div>
           </div>
         </el-form-item>
         <el-form-item label="排序" prop="sort">
@@ -188,11 +239,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { getTypes, createType, updateType, deleteType, createSpec, updateSpec, deleteSpec } from '@/api'
+import { getTypes, createType, updateType, deleteType, createSpec, updateSpec, deleteSpec, getSpecsByScope, linkSpecToType } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Plus, Edit, Delete, Rank } from '@element-plus/icons-vue'
+import { Plus, Edit, Delete, Rank, ArrowDown } from '@element-plus/icons-vue'
 import Sortable from 'sortablejs'
 
 const router = useRouter()
@@ -268,13 +319,21 @@ const currentTypeId = ref('')
 const specFormRef = ref(null)
 const specSubmitLoading = ref(false)
 const specTypeDisabled = ref(false)
+const specDialogMode = ref<'sku'|'prop'>('sku') // tracks SKU vs property mode
+
+const specDialogTitle = computed(() => {
+  if (specIsEdit.value) return specDialogMode.value === 'sku' ? '编辑SKU' : '编辑属性'
+  return specDialogMode.value === 'sku' ? '添加SKU' : '添加私有属性'
+})
+
 const specForm = reactive({
   name: '',
   type: 1,
   inputType: 1,
-  inputOptions: [],
+  inputOptions: [] as string[],
   sort: 0,
   _newOption: '',
+  _batchOptions: '',
   _usedOptions: [] as string[],
 })
 
@@ -285,55 +344,67 @@ const specRules = {
 }
 
 function resetSpecForm() {
-  Object.assign(specForm, { name: '', type: 1, inputType: 1, inputOptions: [], sort: 0, _newOption: '', _usedOptions: [] })
-  specIsEdit.value = false
-  specEditId.value = ''
-  currentTypeId.value = ''
-  specTypeDisabled.value = false
+  Object.assign(specForm, { name: '', type: 1, inputType: 1, inputOptions: [], sort: 0, _newOption: '', _batchOptions: '', _usedOptions: [] })
+  specIsEdit.value = false; specEditId.value = ''; currentTypeId.value = ''
+  specTypeDisabled.value = false; specDialogMode.value = 'sku'
   specFormRef.value?.resetFields()
 }
 
-function addSpecOption() {
-  const val = specForm._newOption?.trim()
-  if (!val) return
-  specForm.inputOptions.push(val)
-  specForm._newOption = ''
-}
-
-function removeSpecOption(index) {
-  if (specForm.inputOptions.length <= 1) {
-    ElMessage.warning('规格值至少需要一个')
-    return
-  }
-  if (isOptionUsed(specForm.inputOptions[index])) {
-    ElMessage.warning('该规格值已被商品SKU使用，无法删除')
-    return
-  }
-  specForm.inputOptions.splice(index, 1)
-}
-
-function handleOpenAddSpec(typeRow) {
-  specIsEdit.value = false
+// SKU dialog helpers
+function handleOpenAddSku(typeRow: any) {
+  specIsEdit.value = false; specDialogMode.value = 'sku'
   currentTypeId.value = typeRow.id
-  specForm.sort = (typeRow.specs || []).length
+  specTypeDisabled.value = true // type locked to SKU
+  specForm.type = 1; specForm.inputType = 1; specForm.inputOptions = []
+  specForm._newOption = ''; specForm.sort = getSkuSpecs(typeRow).length
   specDialogVisible.value = true
 }
 
-function handleOpenEditSpec(spec, typeRow) {
-  specIsEdit.value = true
-  specEditId.value = spec.id
-  specTypeDisabled.value = spec.type === 1 && (typeRow.specs || []).filter((s: any) => s.type === 1).length <= 1
+// Property add: shared or private
+function handleOpenAddProp(typeRow: any) {
+  specIsEdit.value = false; specDialogMode.value = 'prop'
+  currentTypeId.value = typeRow.id
+  specTypeDisabled.value = true // type locked to display
+  specForm.type = 2; specForm.inputType = 1; specForm.inputOptions = []
+  specForm._newOption = ''; specForm.sort = getDisplaySpecs(typeRow).length
+  specDialogVisible.value = true
+}
+
+function handleOpenEditSpec(spec: any, typeRow: any) {
+  specIsEdit.value = true; specEditId.value = spec.id
+  specDialogMode.value = spec.type === 1 ? 'sku' : 'prop'
+  specTypeDisabled.value = true // always disabled in edit to prevent type change
   const options = Array.isArray(spec.inputOptions) ? [...spec.inputOptions] : []
   Object.assign(specForm, {
-    name: spec.name,
-    type: spec.type,
-    inputType: spec.inputType,
-    inputOptions: options,
-    sort: spec.sort || 0,
+    name: spec.name, type: spec.type, inputType: spec.inputType,
+    inputOptions: options, sort: spec.sort || 0,
     _newOption: spec.inputType === 1 ? (options[0] || '') : '',
+    _batchOptions: spec.inputType !== 1 ? (options||[]).join('\n') : '',
     _usedOptions: spec.usedOptions || [],
   })
   specDialogVisible.value = true
+}
+
+function parseBatchOptions() {
+  const raw = specForm._batchOptions?.trim()
+  if (!raw) return
+  // Split by newlines and commas (both Chinese and English)
+  const vals = raw.split(/[\n,，]+/).map((v: string) => v.trim()).filter((v: string) => v)
+  vals.forEach((v: string) => { if (!specForm.inputOptions.includes(v)) specForm.inputOptions.push(v) })
+}
+
+function addSpecOption() {
+  const raw = specForm._newOption?.trim()
+  if (!raw) return
+  const vals = raw.split(/[,，]/).map((v: string) => v.trim()).filter((v: string) => v)
+  vals.forEach((v: string) => { if (!specForm.inputOptions.includes(v)) specForm.inputOptions.push(v) })
+  specForm._newOption = ''
+}
+
+function removeSpecOption(index: number) {
+  if (specForm.inputOptions.length <= 1) { ElMessage.warning('规格值至少需要一个'); return }
+  if (isOptionUsed(specForm.inputOptions[index])) { ElMessage.warning('该规格值已被商品SKU使用，无法删除'); return }
+  specForm.inputOptions.splice(index, 1)
 }
 
 async function handleSpecSubmit() {
@@ -379,59 +450,103 @@ async function handleDeleteSpec(spec) {
   }
 }
 
-function inputTypeLabel(val) {
-  const map = { 1: '唯一值', 2: '单选项', 3: '多选' }
-  return map[val] || '-'
+function inputTypeLabel(val) { const m: any={1:'唯一值',2:'单选项',3:'多选'}; return m[val]||'-' }
+
+// Split specs into SKU (type=1) and display (type=2)
+function getSkuSpecs(row: any) { return (row.specs||[]).filter((s:any)=>s.type===1) }
+function getDisplaySpecs(row: any) { return (row.specs||[]).filter((s:any)=>s.type===2) }
+
+function isOnlySkuSpec(typeRow: any, spec: any) {
+  if (spec.type!==1) return false
+  return getSkuSpecs(typeRow).length <= 1
 }
 
-function isOnlySkuSpec(typeRow, spec) {
-  if (spec.type !== 1) return false
-  const skuSpecs = (typeRow.specs || []).filter((s: any) => s.type === 1)
-  return skuSpecs.length <= 1
-}
-
-function canDeleteSpec(typeRow, spec) {
-  // Cannot delete the last SKU spec of a type
+function canDeleteSkuSpec(typeRow: any, spec: any) {
   if (isOnlySkuSpec(typeRow, spec)) return false
-  // Cannot delete SKU spec if type already has products
-  if (spec.type === 1 && typeRow.productCount > 0) return false
+  if (spec.type===1 && typeRow.productCount>0) return false
   return true
+}
+
+function canDeletePropSpec(_typeRow: any, spec: any) {
+  // Global specs can't be deleted from type page (they're shared)
+  if (spec.scope===0) return false
+  return true
+}
+
+// SKU dialog helpers
+// Property add: shared or private
+const sharedSpecDialogVisible = ref(false)
+const sharedSpecList = ref<any[]>([])
+const sharedSpecSelectedId = ref('')
+
+async function handleAddProperty(cmd: string, typeRow: any) {
+  if (cmd === 'private') {
+    handleOpenAddProp(typeRow)
+  } else {
+    // 引用共享属性
+    currentTypeId.value = typeRow.id
+    sharedSpecSelectedId.value = ''
+    try { sharedSpecList.value = await getSpecsByScope(1) || [] }
+    catch { sharedSpecList.value = [] }
+    sharedSpecDialogVisible.value = true
+  }
+}
+
+async function confirmSharedSpec() {
+  if (!sharedSpecSelectedId.value) { ElMessage.warning('请选择一个共享属性'); return }
+  try {
+    await linkSpecToType({ typeId: currentTypeId.value, specsId: sharedSpecSelectedId.value })
+    ElMessage.success('已引用共享属性')
+    sharedSpecDialogVisible.value = false
+    await loadData()
+  } catch { /* handled */ }
 }
 
 function isOptionUsed(value: string) {
   return specForm._usedOptions.includes(value)
 }
 
-const specSortables = new Map<string, any>()
+const specSortables = new Map<string, any[]>()
 
 function onExpandChange(row: any, expandedRows: any[]) {
   if (!expandedRows.includes(row)) {
-    // Row collapsed — destroy sortable if exists
-    const s = specSortables.get(row.id)
-    if (s) { s.destroy(); specSortables.delete(row.id) }
+    const arr = specSortables.get(row.id)
+    if (arr) { arr.forEach(s=>s.destroy()); specSortables.delete(row.id) }
     return
   }
-  // Row expanded — init Sortable after DOM renders
   nextTick(() => {
-    const el = document.querySelector(`.spec-table-${row.id} .el-table__body-wrapper tbody`)
-    if (!el || specSortables.has(row.id)) return
-    const sortable = Sortable.create(el as HTMLElement, {
-      handle: '.drag-handle',
-      animation: 200,
-      onEnd: async (evt) => {
-        const { oldIndex, newIndex } = evt
-        if (oldIndex === undefined || newIndex === undefined || oldIndex === newIndex) return
-        const arr = [...(row.specs || [])]
-        const moved = arr.splice(oldIndex, 1)[0]
-        arr.splice(newIndex, 0, moved)
-        row.specs = arr
-        for (let i = 0; i < arr.length; i++) {
-          await updateSpec(arr[i].id, { ...arr[i], productType: row.id, sort: i })
-        }
-      },
-    })
-    specSortables.set(row.id, sortable)
+    const sortables: any[] = []
+    // SKU table
+    const skuEl = document.querySelector(`.sku-table-${row.id} .el-table__body-wrapper tbody`)
+    if (skuEl) {
+      sortables.push(Sortable.create(skuEl as HTMLElement, {
+        handle: '.drag-handle', animation: 200,
+        onEnd: (evt:any) => reorderSpecs(row, getSkuSpecs(row), evt),
+      }))
+    }
+    // Property table
+    const propEl = document.querySelector(`.prop-table-${row.id} .el-table__body-wrapper tbody`)
+    if (propEl) {
+      sortables.push(Sortable.create(propEl as HTMLElement, {
+        handle: '.drag-handle', animation: 200,
+        onEnd: (evt:any) => reorderSpecs(row, getDisplaySpecs(row), evt),
+      }))
+    }
+    if (sortables.length) specSortables.set(row.id, sortables)
   })
+}
+
+async function reorderSpecs(row: any, section: any[], evt: any) {
+  const { oldIndex, newIndex } = evt
+  if (oldIndex===undefined||newIndex===undefined||oldIndex===newIndex) return
+  const moved = section.splice(oldIndex, 1)[0]
+  section.splice(newIndex, 0, moved)
+  for (let i=0; i<section.length; i++) {
+    if (section[i].sort !== i) {
+      section[i].sort = i
+      await updateSpec(section[i].id, { ...section[i], productType: row.id, sort: i })
+    }
+  }
 }
 
 async function loadData() {
@@ -480,11 +595,21 @@ onMounted(() => {
   margin-bottom: 12px;
 }
 
+.spec-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-right: 4px;
+}
+
 .expand-title {
   font-weight: 600;
   font-size: 14px;
   color: #303133;
 }
+
+.spec-section .el-button + .el-button { margin-left: 2px; }
 
 .spec-options-editor {
   width: 100%;

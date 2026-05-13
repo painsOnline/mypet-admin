@@ -88,6 +88,14 @@ export function deleteSpec(id) {
   return request({ url: `/admin/spec/${id}`, method: 'delete' })
 }
 
+export function getSpecsByScope(scope) {
+  return request({ url: '/admin/spec/list', method: 'get', params: { scope } })
+}
+
+export function linkSpecToType(data) {
+  return request({ url: '/admin/spec/link', method: 'post', data })
+}
+
 // ---- Order ----
 export function getOrders(params) {
   return request({ url: '/admin/order', method: 'get', params })

@@ -46,6 +46,10 @@
             <el-icon><Setting /></el-icon>
             <span>商品类型</span>
           </el-menu-item>
+          <el-menu-item index="/product/specs">
+            <el-icon><Collection /></el-icon>
+            <span>公共属性</span>
+          </el-menu-item>
           <el-menu-item index="/product/brand">
             <el-icon><PriceTag /></el-icon>
             <span>品牌管理</span>

@@ -41,6 +41,11 @@ const routes = [
         component: () => import('@/views/product/TypeListView.vue'),
       },
       {
+        path: 'product/specs',
+        name: 'SpecsManage',
+        component: () => import('@/views/product/SpecsManageView.vue'),
+      },
+      {
         path: 'product/brand',
         name: 'BrandList',
         component: () => import('@/views/product/BrandListView.vue'),
