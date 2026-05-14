@@ -21,9 +21,13 @@
           <el-input v-model="form.desc" placeholder="请输入商品描述" style="max-width:500px" />
         </el-form-item>
         <el-form-item label="商品品牌" prop="productBrand">
-          <el-select v-model="form.productBrand" placeholder="请选择品牌" style="width:240px">
-            <el-option v-for="b in brandList" :key="b.id" :label="b.brandName" :value="b.id" />
-          </el-select>
+          <div style="display:flex;gap:6px">
+            <el-select v-model="form.productBrand" placeholder="请选择品牌" style="width:240px" filterable>
+              <el-option v-for="b in brandList" :key="b.id" :label="b.brandName" :value="b.id" />
+            </el-select>
+            <el-input v-model="newBrandName" placeholder="输入新品牌名称" style="width:180px" @keyup.enter="quickAddBrand" />
+            <el-button type="primary" :disabled="!newBrandName.trim()" @click="quickAddBrand">快速添加</el-button>
+          </div>
         </el-form-item>
         <el-form-item label="商品分类" prop="productCategory">
           <el-select v-model="form.productCategory" placeholder="请选择分类" style="width:240px">
@@ -53,7 +57,7 @@
         <template v-if="displaySpecs.length > 0 || properties.length > 0">
           <div style="display:flex;align-items:center;justify-content:space-between">
             <h4 class="section-title" style="border:none;margin:0;padding:0">商品属性</h4>
-            <el-button v-if="jieshunFetchedProduct" size="small" type="success" @click="jieshunMatchPanelVisible = !jieshunMatchPanelVisible">
+            <el-button v-if="jieshunFetchedProduct" size="small" type="success" @click="matchJieshunAttrs">
               从街顺匹配属性
             </el-button>
           </div>
@@ -186,6 +190,7 @@
           <el-table-column label="是否匹配" width="80" align="center">
             <template #default="{ row }">
               <el-icon v-if="row.matched" color="#67C23A" :size="20"><SuccessFilled /></el-icon>
+              <el-icon v-else-if="row.emptyValue" color="#909399" :size="20"><WarningFilled /></el-icon>
               <el-icon v-else-if="row.nameMatched" color="#E6A23C" :size="20"><WarningFilled /></el-icon>
               <el-icon v-else color="#F56C6C" :size="20"><CircleCloseFilled /></el-icon>
             </template>
@@ -197,9 +202,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { getProductDetail, createProduct, updateProduct, getCategories, getTypes, getBrands, jieshunSearch, jieshunDetail } from '@/api'
+import { getProductDetail, createProduct, updateProduct, getCategories, getTypes, getBrands, createBrand, jieshunSearch, jieshunDetail } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete, Download, DArrowRight, SuccessFilled, CircleCloseFilled, WarningFilled } from '@element-plus/icons-vue'
 import ImageUploader from '@/components/ImageUploader.vue'
@@ -251,6 +256,24 @@ const rules = {
 const properties = reactive([])
 const skuSpecs = ref([])
 const displaySpecs = ref([])
+
+// Product price follows the lowest SKU price (one-way)
+let syncingPriceFromSkus = false
+watch(() => form.skus, () => {
+  if (syncingPriceFromSkus) return
+  const skus = form.skus as any[]
+  if (!skus || skus.length === 0) return
+  const activeSkus = skus.filter((s: any) => s.price > 0 || s.oldPrice > 0 || s.inventory > 0 || s.picture)
+  if (activeSkus.length === 0) return
+  const lowestPrice = Math.min(...activeSkus.map((s: any) => Number(s.price) || 0).filter((p: number) => p > 0))
+  const lowestOldPrice = Math.min(...activeSkus.map((s: any) => Number(s.oldPrice) || 0).filter((p: number) => p > 0))
+  if (lowestPrice > 0 && lowestPrice !== Infinity) {
+    syncingPriceFromSkus = true
+    form.price = lowestPrice
+    if (lowestOldPrice > 0 && lowestOldPrice !== Infinity) form.oldPrice = lowestOldPrice
+    syncingPriceFromSkus = false
+  }
+}, { deep: true })
 const currentTypeId = ref('')
 const typeSpecsMap = ref({})
 
@@ -370,6 +393,27 @@ async function jieshunFetchDetail() {
     jieshunMatchPanelVisible.value = false
     jieshunMatchList.value = []
 
+    // Auto-match brand from jieshun attrs
+    if (data.dynamic_attrs && Array.isArray(data.dynamic_attrs)) {
+      const brandAttr = data.dynamic_attrs.find((a: any) => a.attr_name === '品牌')
+      if (brandAttr) {
+        const values = (brandAttr.value && Array.isArray(brandAttr.value))
+          ? brandAttr.value.map((v: any) => typeof v === 'object' ? String(v.value || '') : String(v)).filter((s: string) => s.trim())
+          : []
+        if (values.length > 0) {
+          const brandName = values[0]
+          const existing = brandList.value.find((b: any) => b.brandName === brandName)
+          if (existing) {
+            form.productBrand = existing.id
+          } else {
+            // Fill into quick-add input, let user confirm
+            newBrandName.value = brandName
+            ElMessage.info(`街顺品牌"${brandName}"不存在，已填入快速新增框，请确认后点击添加`)
+          }
+        }
+      }
+    }
+
     // Fill product form
     const product = data
     form.name = product.name || ''
@@ -443,6 +487,25 @@ function onTypeChange(typeId) {
   properties.splice(0, properties.length)
 }
 
+const newBrandName = ref('')
+
+async function quickAddBrand() {
+  const name = newBrandName.value.trim()
+  if (!name) return
+  // Check duplicate
+  if (brandList.value.find((b: any) => b.brandName === name)) {
+    ElMessage.warning('该品牌已存在')
+    return
+  }
+  try {
+    const newBrand = await createBrand({ brandName: name, brandLogo: '', sort: 0 })
+    brandList.value.push(newBrand)
+    form.productBrand = newBrand.id
+    newBrandName.value = ''
+    ElMessage.success(`已添加品牌：${name}`)
+  } catch { /* handled */ }
+}
+
 function addProperty(spec) {
   properties.push({
     name: spec.name,
@@ -470,12 +533,18 @@ function matchJieshunAttrs() {
 
   attrs.forEach((a: any) => {
     if (!a.attr_name) return
-    const values = (a.value && Array.isArray(a.value)) ? a.value.map((v: any) => typeof v === 'object' ? String(v.value || '') : String(v)) : []
+    const rawValues = (a.value && Array.isArray(a.value)) ? a.value.map((v: any) => typeof v === 'object' ? String(v.value || '') : String(v)) : []
+    const values = rawValues.filter((v: string) => v.trim() !== '')
     const rawJson = JSON.stringify(a)
-    // Find matching display spec by name
+
     const spec = displaySpecs.value.find((s: any) => s.name === a.attr_name)
     if (!spec) {
-      list.push({ attr_name: a.attr_name, value: values, matched: false, nameMatched: false, rawJson })
+      list.push({ attr_name: a.attr_name, value: values, matched: false, nameMatched: false, emptyValue: false, rawJson })
+      return
+    }
+    // If jieshun values are all empty after trim, skip - don't add property
+    if (values.length === 0) {
+      list.push({ attr_name: a.attr_name, value: [], matched: false, nameMatched: true, emptyValue: true, rawJson })
       return
     }
     // Auto-add property if not already present
@@ -485,7 +554,7 @@ function matchJieshunAttrs() {
       prop = (properties as any[]).find((p: any) => p.name === a.attr_name)
       if (prop) autoAdded++
     }
-    if (!prop) { list.push({ attr_name: a.attr_name, value: values, matched: false, nameMatched: true, rawJson }); return }
+    if (!prop) { list.push({ attr_name: a.attr_name, value: values, matched: false, nameMatched: true, emptyValue: false, rawJson }); return }
     // Match values
     const localOptions: string[] = spec.inputOptions || []
     let matched = false
@@ -500,7 +569,7 @@ function matchJieshunAttrs() {
       if (matches.length > 0) { prop.value = matches; matched = true }
     }
     if (matched) matchedCount++
-    list.push({ attr_name: a.attr_name, value: values, matched, nameMatched: true, rawJson })
+    list.push({ attr_name: a.attr_name, value: values, matched, nameMatched: true, emptyValue: false, rawJson })
   })
 
   jieshunMatchList.value = list

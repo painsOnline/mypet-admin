@@ -143,11 +143,11 @@
     <!-- 街顺SKU导入抽屉 -->
     <el-drawer v-if="jieshunProduct" v-model="skuDrawerVisible" title="从街顺导入SKU" direction="rtl" size="750px">
       <div v-if="jieshunProduct && jieshunProduct.skus" style="padding:0 20px">
-        <el-table :data="jieshunProduct.skus" size="small" highlight-current-row
+        <el-table :data="jieshunProduct.skus" size="small" highlight-current-row :row-class-name="({row}:any)=>usedJieshunSkuIds.includes(row.id)?'jieshun-used-row':''"
           @current-change="onJieshunSkuSelect" ref="jieshunSkuTableRef" max-height="500">
           <el-table-column label="选择" width="55">
             <template #default="{ row }">
-              <el-radio v-model="jieshunSelectedSkuId" :value="row.id" />
+              <el-radio v-model="jieshunSelectedSkuId" :value="row.id" :disabled="usedJieshunSkuIds.includes(row.id)" />
             </template>
           </el-table-column>
           <el-table-column prop="name" label="SKU名称" min-width="140" show-overflow-tooltip />
@@ -389,6 +389,15 @@ const jieshunSelectedSkuId = ref(null)
 const jieshunSkuTableRef = ref(null)
 const skuDrawerTargetIndex = ref(-1)
 
+// Track which jieshun SKU IDs are already assigned to local SKU rows
+const usedJieshunSkuIds = computed(() => {
+  const ids: string[] = []
+  localSkus.forEach((s: any) => {
+    if (s._jieshunSkuId) ids.push(s._jieshunSkuId)
+  })
+  return ids
+})
+
 function openSkuDrawer(skuIndex: number) {
   skuDrawerTargetIndex.value = skuIndex
   jieshunSelectedSkuId.value = null
@@ -427,6 +436,7 @@ function applyJieshunSku() {
   target.costPrice = Number(selectedSku.purchase_price || 0)
   target.barcode = newBarcode
   target.inventory = 0
+  target._jieshunSkuId = selectedSku.id
 
   // For unique-value specs (inputType=1), set the value to the imported SKU name
   const jieshunSkuName = selectedSku.name || ''
@@ -608,6 +618,7 @@ watch(localSkus, () => {
 .is-error :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px #f56c6c inset; }
 
 .sku-hint { margin-top: 10px; font-size: 12px; color: #909399; }
+:deep(.jieshun-used-row) { background-color: #f0f0f0 !important; color: #c0c4cc; }
 .sku-drop { width: 130px; }
 .sku-drop :deep(.el-upload) { width: 130px; }
 .sku-drop :deep(.el-upload-dragger) { width: 130px; height: 130px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0; }
