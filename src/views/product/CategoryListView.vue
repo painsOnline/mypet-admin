@@ -46,7 +46,7 @@
           <el-input v-model="form.name" placeholder="请输入分类名称" />
         </el-form-item>
         <el-form-item label="分类图片" prop="picture">
-          <ImageUploader v-model="form.picture" />
+          <ImageUploader v-model="form.picture" category="category" />
         </el-form-item>
         <el-form-item label="排序" prop="sort">
           <el-input-number v-model="form.sort" :min="0" style="width: 120px" />

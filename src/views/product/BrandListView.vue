@@ -34,7 +34,7 @@
           <el-input v-model="form.brandEn" placeholder="选填" />
         </el-form-item>
         <el-form-item label="品牌Logo" prop="brandLogo">
-          <ImageUploader v-model="form.brandLogo" />
+          <ImageUploader v-model="form.brandLogo" category="brand" />
         </el-form-item>
         <el-form-item label="品牌简介" prop="brandDesc">
           <el-input v-model="form.brandDesc" type="textarea" :rows="3" placeholder="选填" />

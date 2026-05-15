@@ -123,6 +123,10 @@
                   <el-tag :type="statusType(orderDetail.orderStatus)" size="small">{{ statusLabel(orderDetail.orderStatus) }}</el-tag>
                 </el-descriptions-item>
                 <el-descriptions-item label="订单备注">{{ orderDetail.buyerMessage || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="卖家备注">
+                  <el-input v-model="sellerMessageDraft" type="textarea" :rows="5" style="width:100%" placeholder="卖家备注" />
+                  <el-button type="primary" size="small" style="margin-top:6px" @click="saveSellerMessage">保存</el-button>
+                </el-descriptions-item>
                 <el-descriptions-item label="配送时间">{{ orderDetail.deliveryTime || '-' }}</el-descriptions-item>
                 <el-descriptions-item label="收货人姓名">{{ orderDetail.receiver?.receiver || '-' }}</el-descriptions-item>
                 <el-descriptions-item label="收货人电话">{{ orderDetail.receiver?.contact || '-' }}</el-descriptions-item>
@@ -178,7 +182,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getPendingOrders, getOrderDetail, dispatchOrder, batchDispatchOrder, batchCancelOrder, confirmReceipt, approveRefund, rejectRefund, cancelOrder } from '@/api'
+import { getPendingOrders, getOrderDetail, dispatchOrder, batchDispatchOrder, batchCancelOrder, confirmReceipt, approveRefund, rejectRefund, cancelOrder, updateSellerMessage } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown, Phone, UserFilled } from '@element-plus/icons-vue'
 
@@ -189,6 +193,7 @@ const selectedRows = ref<any[]>([])
 const detailVisible = ref(false)
 const orderDetail = ref<any>(null)
 const activeTab = ref('info')
+const sellerMessageDraft = ref('')
 
 const sortState = reactive({ sortBy: 'modifyTime', sortOrder: 'desc' })
 const pagination = reactive({ page: 1, pageSize: 12, counts: 0, pages: 0 })
@@ -220,7 +225,19 @@ function onSelectionChange(selection: any[]) { selectedRows.value = selection }
 async function openDetail(id: string) {
   activeTab.value = 'info'
   detailVisible.value = true
-  try { orderDetail.value = await getOrderDetail(id) } catch { /* ignore */ }
+  try {
+    orderDetail.value = await getOrderDetail(id)
+    sellerMessageDraft.value = orderDetail.value?.sellerMessage || ''
+  } catch { /* ignore */ }
+}
+
+async function saveSellerMessage() {
+  if (!orderDetail.value) return
+  try {
+    await updateSellerMessage(orderDetail.value.id, sellerMessageDraft.value)
+    orderDetail.value.sellerMessage = sellerMessageDraft.value
+    ElMessage.success('卖家备注已保存')
+  } catch { /* ignore */ }
 }
 
 const flatSkuList = computed(() => {

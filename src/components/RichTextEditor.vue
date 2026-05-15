@@ -19,6 +19,7 @@ import request from '@/api/request'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
+  productId: { type: String, default: '' },
 })
 const emit = defineEmits(['update:modelValue'])
 
@@ -40,8 +41,18 @@ const editorConfig = {
         const formData = new FormData()
         formData.append('file', file)
         try {
+          let uploadUrl = '/admin/upload/image'
+          const params = new URLSearchParams()
+          if (props.productId) {
+            params.append('type', 'product/detail')
+            params.append('productId', props.productId)
+          } else {
+            params.append('type', 'temp/products')
+          }
+          const qs = params.toString()
+          if (qs) uploadUrl += '?' + qs
           const url = await request({
-            url: '/admin/upload/image',
+            url: uploadUrl,
             method: 'post',
             data: formData,
             headers: { 'Content-Type': 'multipart/form-data' },

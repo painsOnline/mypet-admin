@@ -34,7 +34,9 @@ service.interceptors.response.use(
         authStore.logout()
         router.push('/login')
       }
-      return Promise.reject(new Error(res.msg || '请求失败'))
+      const err: any = new Error(res.msg || '请求失败')
+      err.code = res.code
+      return Promise.reject(err)
     }
     return res.result
   },

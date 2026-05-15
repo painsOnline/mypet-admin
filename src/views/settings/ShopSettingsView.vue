@@ -10,7 +10,7 @@
           <el-input v-model="shopForm.name" placeholder="请输入店铺名称" style="width: 400px" />
         </el-form-item>
         <el-form-item label="店铺Logo" prop="logo">
-          <ImageUploader v-model="shopForm.logo" />
+          <ImageUploader v-model="shopForm.logo" category="logo" />
         </el-form-item>
         <el-form-item label="起配金额" prop="freeShippingAmount">
           <el-input-number v-model="shopForm.freeShippingAmount" :min="0" :precision="2" style="width: 200px" />
@@ -85,7 +85,7 @@ function removeBannerItem(idx: number) {
 async function uploadBanner(opt: any, idx: number) {
   const formData = new FormData(); formData.append('file', opt.file)
   try {
-    const url = await request({ url: '/admin/upload/image', method: 'post', data: formData, headers: { 'Content-Type': 'multipart/form-data' } }) as string
+    const url = await request({ url: '/admin/upload/image?type=banner', method: 'post', data: formData, headers: { 'Content-Type': 'multipart/form-data' } }) as string
     bannerItems.value[idx].imgUrl = url
   } catch { ElMessage.error('上传失败') }
 }

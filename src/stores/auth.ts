@@ -12,9 +12,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isLoggedIn = computed(() => !!token.value)
 
-  async function login(tCode, account, password) {
+  async function login(tCode, account, password, captchaToken?, captchaInput?) {
     tenantCode.value = tCode
-    const data = await loginApi(account, password)
+    const data = await loginApi(account, password, captchaToken, captchaInput)
     token.value = data.token
     adminInfo.value = {
       account: data.adminName || data.account || account,

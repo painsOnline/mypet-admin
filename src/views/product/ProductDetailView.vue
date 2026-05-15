@@ -49,7 +49,7 @@
           <el-input-number v-model="form.sort" :min="0" style="width:120px" />
         </el-form-item>
         <el-form-item label="商品图片">
-          <ImageUploader v-model="form.mainPictures" />
+          <ImageUploader v-model="form.mainPictures" :category="isCreate ? 'temp/products' : 'product/main'" :product-id="isCreate ? '' : props.id" />
           <div class="form-hint">第一张为主图，可拖拽图片排序</div>
         </el-form-item>
 
@@ -86,11 +86,11 @@
 
         <!-- SKU管理 -->
         <h4 class="section-title">SKU管理</h4>
-        <SkuEditor v-model:skus="form.skus" :specs="skuSpecs" :jieshun-product="jieshunFetchedProduct" :product-pictures="form.mainPictures" />
+        <SkuEditor v-model:skus="form.skus" :specs="skuSpecs" :jieshun-product="jieshunFetchedProduct" :product-pictures="form.mainPictures" :product-id="isCreate ? '' : props.id" />
 
         <!-- 商品详情 -->
         <h4 class="section-title">商品详情</h4>
-        <RichTextEditor v-model="form.detail" />
+        <RichTextEditor v-model="form.detail" :product-id="isCreate ? '' : props.id" />
 
         <!-- 提交 -->
         <div class="form-footer">

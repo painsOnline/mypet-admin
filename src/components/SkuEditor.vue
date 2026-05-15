@@ -185,6 +185,7 @@ const props = defineProps({
   skus: { type: Array, default: () => [] },
   jieshunProduct: { type: Object, default: null },
   productPictures: { type: Array, default: () => [] },
+  productId: { type: String, default: '' },
 })
 const emit = defineEmits(['update:skus', 'update:specs'])
 
@@ -527,9 +528,19 @@ function isSkuActive(sku: any) {
 async function uploadSkuImage(opt: any, si: number) {
   const formData = new FormData()
   formData.append('file', opt.file)
+  let uploadUrl = '/admin/upload/image'
+  const params = new URLSearchParams()
+  if (props.productId) {
+    params.append('type', 'product/sku')
+    params.append('productId', props.productId)
+  } else {
+    params.append('type', 'temp/products')
+  }
+  const qs = params.toString()
+  if (qs) uploadUrl += '?' + qs
   try {
     const url = await request({
-      url: '/admin/upload/image',
+      url: uploadUrl,
       method: 'post',
       data: formData,
       headers: { 'Content-Type': 'multipart/form-data' },

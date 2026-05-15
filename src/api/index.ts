@@ -137,6 +137,10 @@ export function cancelOrder(id) {
   return request({ url: `/admin/order/${id}/cancel`, method: 'put' })
 }
 
+export function updateSellerMessage(id, sellerMessage) {
+  return request({ url: `/admin/order/${id}/sellerMessage`, method: 'put', data: { sellerMessage } })
+}
+
 // ---- Brand ----
 export function getBrands() {
   return request({ url: '/admin/brand', method: 'get' })

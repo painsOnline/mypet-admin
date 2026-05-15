@@ -64,6 +64,8 @@ import request from '@/api/request'
 const props = defineProps({
   modelValue: { type: [String, Array], default: '' },
   maxCount: { type: Number, default: 10 },
+  category: { type: String, default: '' },
+  productId: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -89,8 +91,14 @@ function moveItem(index: number, direction: number) {
 async function doUpload(file: File): Promise<string> {
   const formData = new FormData()
   formData.append('file', file)
+  let url = '/admin/upload/image'
+  const params = new URLSearchParams()
+  if (props.category) params.append('type', props.category)
+  if (props.productId) params.append('productId', props.productId)
+  const qs = params.toString()
+  if (qs) url += '?' + qs
   const resp = await request({
-    url: '/admin/upload/image',
+    url,
     method: 'post',
     data: formData,
     headers: { 'Content-Type': 'multipart/form-data' },
