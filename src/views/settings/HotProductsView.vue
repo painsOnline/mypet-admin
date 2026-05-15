@@ -100,7 +100,7 @@
           />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="searchProducts">
+          <el-button type="primary" @click="searchProducts(true)">
             <el-icon><Search /></el-icon>
             搜索
           </el-button>
@@ -237,7 +237,8 @@ async function onSelectorOpen() {
   searchProducts()
 }
 
-async function searchProducts() {
+async function searchProducts(resetPage = false) {
+  if (resetPage) selectorPage.page = 1
   productSearchLoading.value = true
   try {
     const params: any = {

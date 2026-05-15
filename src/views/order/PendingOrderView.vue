@@ -106,7 +106,7 @@
       <div class="pagination-wrap">
         <el-pagination v-model:current-page="pagination.page" v-model:page-size="pagination.pageSize"
           :page-sizes="[6,12,20,50]" :total="pagination.counts" layout="total,sizes,prev,pager,next,jumper"
-          @size-change="loadTable" @current-change="loadTable" />
+          @size-change="handlePageSizeChange" @current-change="loadTable" />
       </div>
     </el-card>
 
@@ -207,6 +207,8 @@ function statusType(status: number) {
   const map: Record<number, string> = { 1: 'info', 2: 'primary', 3: 'warning', 4: 'success', 5: 'danger' }
   return map[status] || 'info'
 }
+
+function handlePageSizeChange() { pagination.page = 1; loadTable() }
 
 async function loadTable() {
   loading.value = true

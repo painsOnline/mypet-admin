@@ -37,7 +37,7 @@
                   <el-table-column label="操作" width="140" fixed="right">
                     <template #default="{ row: spec }">
                       <el-button type="primary" size="small" @click="handleOpenEditSpec(spec,row)"><el-icon><Edit /></el-icon>编辑</el-button>
-                      <el-popconfirm v-if="canDeleteSkuSpec(row,spec)" title="确定删除？" @confirm="handleDeleteSpec(spec)">
+                      <el-popconfirm v-if="canDeleteSkuSpec(row,spec)" title="确定删除？" @confirm="handleDeleteSpec(spec,row)">
                         <template #reference>
                           <el-button type="danger" size="small"><el-icon><Delete /></el-icon>删除</el-button>
                         </template>
@@ -90,7 +90,7 @@
                   <el-table-column label="操作" width="140" fixed="right">
                     <template #default="{ row: spec }">
                       <el-button type="primary" size="small" @click="handleOpenEditSpec(spec,row)"><el-icon><Edit /></el-icon>编辑</el-button>
-                      <el-popconfirm v-if="canDeletePropSpec(row,spec)" title="确定删除？" @confirm="handleDeleteSpec(spec)">
+                      <el-popconfirm v-if="canDeletePropSpec(row,spec)" title="确定删除？" @confirm="handleDeleteSpec(spec,row)">
                         <template #reference>
                           <el-button type="danger" size="small"><el-icon><Delete /></el-icon>删除</el-button>
                         </template>
@@ -248,7 +248,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { getTypes, createType, updateType, deleteType, createSpec, updateSpec, deleteSpec, getSpecsByScope, linkSpecToType } from '@/api'
+import { getTypes, createType, updateType, deleteType, createSpec, updateSpec, deleteSpec, getSpecsByScope, linkSpecToType, unlinkSpecFromType } from '@/api'
 import { ElMessage } from 'element-plus'
 import { Plus, Edit, Delete, Rank, ArrowDown } from '@element-plus/icons-vue'
 import Sortable from 'sortablejs'
@@ -397,8 +397,17 @@ async function handleSpecSubmit() {
   } catch (e) { /* handled */ } finally { specSubmitLoading.value = false }
 }
 
-async function handleDeleteSpec(spec) {
-  try { await deleteSpec(spec.id); ElMessage.success('删除成功'); await loadData() } catch (e) { /* handled */ }
+async function handleDeleteSpec(spec, typeRow) {
+  try {
+    if (spec.scope === 1) {
+      await unlinkSpecFromType({ typeId: typeRow.id, specsId: spec.id })
+      ElMessage.success('已解除引用')
+    } else {
+      await deleteSpec(spec.id)
+      ElMessage.success('删除成功')
+    }
+    await loadData()
+  } catch (e) { /* handled */ }
 }
 
 function inputTypeLabel(val) { const m: any={1:'唯一值',2:'单选项',3:'多选'}; return m[val]||'-' }

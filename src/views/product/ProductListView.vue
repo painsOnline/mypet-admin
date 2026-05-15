@@ -139,8 +139,8 @@
           :page-sizes="[6, 12, 20, 50]"
           :total="pagination.counts"
           layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleSearch"
-          @current-change="handleSearch"
+          @size-change="handlePageChange"
+          @current-change="handlePageChange"
         />
       </div>
     </el-card>
@@ -237,6 +237,10 @@ async function loadTable() {
 
 async function handleSearch() {
   pagination.page = 1
+  await loadTable()
+}
+
+async function handlePageChange() {
   await loadTable()
 }
 

@@ -96,6 +96,10 @@ export function linkSpecToType(data) {
   return request({ url: '/admin/spec/link', method: 'post', data })
 }
 
+export function unlinkSpecFromType(data) {
+  return request({ url: '/admin/spec/unlink', method: 'post', data })
+}
+
 // ---- Order ----
 export function getOrders(params) {
   return request({ url: '/admin/order', method: 'get', params })

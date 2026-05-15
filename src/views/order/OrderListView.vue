@@ -130,7 +130,7 @@
       <div class="pagination-wrap">
         <el-pagination v-model:current-page="pagination.page" v-model:page-size="pagination.pageSize"
           :page-sizes="[6,12,20,50]" :total="pagination.counts" layout="total,sizes,prev,pager,next,jumper"
-          @size-change="handleSearch" @current-change="handleSearch" />
+          @size-change="handleSearch" @current-change="loadTable" />
       </div>
     </el-card>
 

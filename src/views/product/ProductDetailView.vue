@@ -103,7 +103,7 @@
     </el-card>
 
     <!-- 街顺商品导入弹窗 -->
-    <el-dialog v-model="jieshunDialogVisible" title="从街顺系统导入商品" width="900px" :close-on-click-modal="false" @closed="onJieshunDialogClosed">
+    <el-dialog v-model="jieshunDialogVisible" title="从街顺系统导入商品" width="900px" :close-on-click-modal="false" @closed="onJieshunDialogClosed" @opened="nextTick(() => jieshunBarcodeRef?.focus())">
       <el-alert type="warning" :closable="false" style="margin-bottom:16px">
         <template #title>
           需要先登录<a href="https://s.waisongbang.com/#/account/ac_manage" target="_blank" style="color:#409EFF">街顺系统后台</a>，否则无法获取商品数据
@@ -122,7 +122,7 @@
         </el-form-item>
         <el-form-item label="条形码">
           <div style="display:flex;align-items:center;gap:8px">
-            <el-input v-model="jieshunBarcode" placeholder="请输入条形码" style="width:200px" @keyup.enter="jieshunDoSearch" />
+            <el-input ref="jieshunBarcodeRef" v-model="jieshunBarcode" placeholder="请输入条形码" style="width:200px" @keyup.enter="jieshunDoSearch" />
             <span style="color:#909399;font-size:12px">（对应街顺UPC）</span>
           </div>
         </el-form-item>
@@ -291,6 +291,7 @@ const jieshunSelectedId = ref(null)
 const jieshunSearchLoading = ref(false)
 const jieshunDetailLoading = ref(false)
 const jieshunTableRef = ref(null)
+const jieshunBarcodeRef = ref(null)
 // Holds the full fetched product (with SKUs) for later SKU-level import
 const jieshunFetchedProduct = ref(null)
 const jieshunMatchPanelVisible = ref(false)
