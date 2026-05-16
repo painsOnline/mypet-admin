@@ -438,6 +438,10 @@ function applyJieshunSku() {
   target.barcode = newBarcode
   target.inventory = 0
   target._jieshunSkuId = selectedSku.id
+  // Default SKU picture to first main product picture if not already set
+  if (!target.picture && props.productPictures && props.productPictures.length > 0) {
+    target.picture = props.productPictures[0]
+  }
 
   // For unique-value specs (inputType=1), set the value to the imported SKU name
   const jieshunSkuName = selectedSku.name || ''

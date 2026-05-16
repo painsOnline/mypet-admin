@@ -4,8 +4,8 @@
       <template #header>
         <div class="card-header">
           <h3>{{ isCreate ? '新增商品' : '编辑商品' }}</h3>
-          <el-button v-if="isCreate" type="success" @click="openJieshunDialog">
-            <el-icon><Download /></el-icon> 从街顺导入商品
+          <el-button type="success" @click="openJieshunDialog">
+            <el-icon><Download /></el-icon> {{ isCreate ? '从街顺导入商品' : '从街顺同步商品' }}
           </el-button>
         </div>
       </template>
@@ -103,7 +103,7 @@
     </el-card>
 
     <!-- 街顺商品导入弹窗 -->
-    <el-dialog v-model="jieshunDialogVisible" title="从街顺系统导入商品" width="900px" :close-on-click-modal="false" @closed="onJieshunDialogClosed" @opened="nextTick(() => jieshunBarcodeRef?.focus())">
+    <el-dialog v-model="jieshunDialogVisible" :title="isCreate ? '从街顺系统导入商品' : '从街顺系统同步商品'" width="900px" :close-on-click-modal="false" @closed="onJieshunDialogClosed" @opened="nextTick(() => jieshunBarcodeRef?.focus())">
       <el-alert type="warning" :closable="false" style="margin-bottom:16px">
         <template #title>
           需要先登录<a href="https://s.waisongbang.com/#/account/ac_manage" target="_blank" style="color:#409EFF">街顺系统后台</a>，否则无法获取商品数据
@@ -160,8 +160,22 @@
         <el-button @click="jieshunDialogVisible = false">取消</el-button>
         <el-button type="primary" :disabled="!jieshunSelectedId" :loading="jieshunDetailLoading"
           @click="jieshunFetchDetail">
-          导入商品基本信息
+          {{ isCreate ? '导入商品基本信息' : '同步商品基本信息' }}
         </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 从街顺同步商品 - 覆盖模块选择 -->
+    <el-dialog v-model="jieshunSyncDialogVisible" title="选择覆盖模块" width="500px" :close-on-click-modal="false">
+      <div style="margin-bottom:12px;color:#606266">请选择需要用街顺数据覆盖的模块：</div>
+      <el-checkbox-group v-model="jieshunSyncModules">
+        <el-checkbox v-for="m in jieshunSyncModuleOptions" :key="m.key" :label="m.key" :disabled="m.disabled" style="display:block;margin-bottom:10px">
+          {{ m.label }}<span v-if="m.disabled" style="color:#909399;font-size:12px">（新增时不覆盖此项）</span>
+        </el-checkbox>
+      </el-checkbox-group>
+      <template #footer>
+        <el-button @click="jieshunSyncDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmJieshunSync">确认覆盖</el-button>
       </template>
     </el-dialog>
 
@@ -297,6 +311,17 @@ const jieshunFetchedProduct = ref(null)
 const jieshunMatchPanelVisible = ref(false)
 const jieshunMatchList = ref<any[]>([])
 
+// Sync dialog for edit mode
+const jieshunSyncDialogVisible = ref(false)
+const jieshunSyncModules = ref<string[]>(['name', 'pictures', 'attrs', 'detail'])
+const jieshunSyncModuleOptions = [
+  { key: 'name', label: '商品名称', disabled: false },
+  { key: 'price', label: '商品价格', disabled: false },
+  { key: 'pictures', label: '商品轮播图', disabled: false },
+  { key: 'attrs', label: '商品属性', disabled: false },
+  { key: 'detail', label: '商品详情', disabled: false },
+]
+
 function getJieshunCachedToken() {
   const stored = localStorage.getItem(JIESHUN_TOKEN_KEY)
   if (stored) {
@@ -329,6 +354,13 @@ function openJieshunDialog() {
   jieshunStoreId.value = '1289567'
   jieshunVendorId.value = '5406'
   jieshunBarcode.value = ''
+  // Edit mode: pre-fill barcode from first SKU
+  if (!isCreate.value) {
+    const skus = form.skus as any[]
+    if (skus && skus.length > 0 && skus[0].barcode) {
+      jieshunBarcode.value = skus[0].barcode
+    }
+  }
   jieshunSearchResults.value = []
   jieshunSelectedId.value = null
   jieshunDialogVisible.value = true
@@ -377,7 +409,7 @@ async function jieshunFetchDetail() {
         { confirmButtonText: '确定覆盖', cancelButtonText: '取消', type: 'warning' }
       )
     } catch {
-      return // user cancelled
+      return
     }
   }
 
@@ -389,69 +421,91 @@ async function jieshunFetchDetail() {
     })
     if (!data) return
 
-    // Store full product for SKU-level import
     jieshunFetchedProduct.value = data
     jieshunMatchPanelVisible.value = false
     jieshunMatchList.value = []
+    jieshunDialogVisible.value = false
 
-    // Auto-match brand from jieshun attrs
-    if (data.dynamic_attrs && Array.isArray(data.dynamic_attrs)) {
-      const brandAttr = data.dynamic_attrs.find((a: any) => a.attr_name === '品牌')
-      if (brandAttr) {
-        const values = (brandAttr.value && Array.isArray(brandAttr.value))
-          ? brandAttr.value.map((v: any) => typeof v === 'object' ? String(v.value || '') : String(v)).filter((s: string) => s.trim())
-          : []
-        if (values.length > 0) {
-          const brandName = values[0]
-          const existing = brandList.value.find((b: any) => b.brandName === brandName)
-          if (existing) {
-            form.productBrand = existing.id
-          } else {
-            // Fill into quick-add input, let user confirm
-            newBrandName.value = brandName
-            ElMessage.info(`街顺品牌"${brandName}"不存在，已填入快速新增框，请确认后点击添加`)
-          }
+    if (isCreate.value) {
+      // Create mode: auto-apply and open match panel
+      applyJieshunData(data, ['name', 'price', 'pictures', 'detail'])
+      matchJieshunAttrs()
+      ElMessage.success('已从街顺导入商品信息，请选择商品类型后匹配SKU')
+    } else {
+      // Edit mode: show sync module selection dialog
+      jieshunSyncModules.value = ['name', 'pictures', 'attrs', 'detail']
+      jieshunSyncDialogVisible.value = true
+    }
+  } catch { /* handled by axios */ }
+  finally { jieshunDetailLoading.value = false }
+}
+
+function applyJieshunData(data: any, modules: string[]) {
+  // Auto-match brand
+  if (data.dynamic_attrs && Array.isArray(data.dynamic_attrs)) {
+    const brandAttr = data.dynamic_attrs.find((a: any) => a.attr_name === '品牌')
+    if (brandAttr) {
+      const values = (brandAttr.value && Array.isArray(brandAttr.value))
+        ? brandAttr.value.map((v: any) => typeof v === 'object' ? String(v.value || '') : String(v)).filter((s: string) => s.trim())
+        : []
+      if (values.length > 0) {
+        const brandName = values[0]
+        const existing = brandList.value.find((b: any) => b.brandName === brandName)
+        if (existing) {
+          form.productBrand = existing.id
+        } else {
+          newBrandName.value = brandName
+          ElMessage.info(`街顺品牌"${brandName}"不存在，已填入快速新增框，请确认后点击添加`)
         }
       }
     }
+  }
 
-    // Fill product form
-    const product = data
-    form.name = product.name || ''
+  // Name
+  if (modules.includes('name')) {
+    form.name = data.name || ''
+  }
 
-    // Carousel images: images[].thumb
+  // Pictures
+  if (modules.includes('pictures')) {
     const pics: string[] = []
-    if (product.images && Array.isArray(product.images)) {
-      product.images.forEach((img: any) => {
-        if (img.thumb) pics.push(img.thumb)
-      })
+    if (data.images && Array.isArray(data.images)) {
+      data.images.forEach((img: any) => { if (img.thumb) pics.push(img.thumb) })
     }
     form.mainPictures = pics
     form.picture = pics.length > 0 ? pics[0] : ''
+  }
 
-    // Detail images: detail_images[].url as <img> tags
+  // Detail
+  if (modules.includes('detail')) {
     const detailParts: string[] = []
-    if (product.detail_images && Array.isArray(product.detail_images)) {
-      product.detail_images.forEach((di: any) => {
-        if (di.url) detailParts.push(`<img src="${di.url}"/>`)
-      })
+    if (data.detail_images && Array.isArray(data.detail_images)) {
+      data.detail_images.forEach((di: any) => { if (di.url) detailParts.push(`<img src="${di.url}"/>`) })
     }
     form.detail = detailParts.join('')
+  }
 
-    // Price: lowest retail_price among SKUs, oldPrice = price * 1.2 (round 2 decimals)
-    if (product.skus && Array.isArray(product.skus) && product.skus.length > 0) {
-      const prices = product.skus.map((s: any) => Number(s.retail_price) || 0).filter((p: number) => p > 0)
+  // Price
+  if (modules.includes('price')) {
+    if (data.skus && Array.isArray(data.skus) && data.skus.length > 0) {
+      const prices = data.skus.map((s: any) => Number(s.retail_price) || 0).filter((p: number) => p > 0)
       if (prices.length > 0) {
-        const lowestPrice = Math.min(...prices)
-        form.price = lowestPrice
-        form.oldPrice = Math.round(lowestPrice * 1.2 * 100) / 100
+        form.price = Math.min(...prices)
+        form.oldPrice = Math.round(form.price * 1.2 * 100) / 100
       }
     }
+  }
+}
 
-    jieshunDialogVisible.value = false
-    ElMessage.success('商品基本信息已从街顺导入商品，请选择商品类型后匹配SKU')
-  } catch { /* handled by axios */ }
-  finally { jieshunDetailLoading.value = false }
+function confirmJieshunSync() {
+  if (!jieshunFetchedProduct.value) return
+  const modules = jieshunSyncModules.value
+  applyJieshunData(jieshunFetchedProduct.value, modules)
+  if (modules.includes('attrs')) {
+    matchJieshunAttrs()
+  }
+  jieshunSyncDialogVisible.value = false
+  ElMessage.success('已按选择同步商品信息')
 }
 
 function onJieshunDialogClosed() {
