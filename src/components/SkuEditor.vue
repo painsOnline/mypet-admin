@@ -316,21 +316,27 @@ function rebuildSkus() {
     localSkus.splice(0, localSkus.length)
     return
   }
-  // Build arrays of only selected values
+  // Build arrays of only selected values (new format with spec_id + value_id)
   const arrays = specsWithSelection.map((s: any) => {
     const sel: number[] = s._selected || []
-    return sel.map((i: number) => ({ name: s.name, valueName: s.inputOptions[i] }))
+    const vals = s.valuesList || []
+    return sel.map((i: number) => ({
+      spec_id: s.id,
+      spec_name: s.name,
+      value_name: s.inputOptions[i],
+      value_id: (vals[i]) ? vals[i].id : ''
+    }))
   })
   const combos = cartesianProduct(arrays)
   // Preserve existing SKU data for same spec combinations
   const oldMap = new Map()
   for (const sku of localSkus) {
-    const key = specsWithSelection.map((s: any) => sku.specMap[s.name] || '').join('||')
+    const key = specsWithSelection.map((s: any) => (sku.specMap && sku.specMap[s.name]) || '').join('||')
     oldMap.set(key, sku)
   }
   const newSkus = combos.map((combo: any[]) => {
     const specMap: Record<string, string> = {}
-    combo.forEach(({ name, valueName }) => { specMap[name] = valueName })
+    combo.forEach(({ spec_name, value_name }) => { specMap[spec_name] = value_name })
     const key = specsWithSelection.map((s: any) => specMap[s.name] || '').join('||')
     const old = oldMap.get(key)
     return {
@@ -349,6 +355,29 @@ function rebuildSkus() {
 
 function generateCombinations() {
   rebuildSkus()
+}
+
+function buildSpecsFromSpecMap(specMap: Record<string, string>, existingSpecs: any[]) {
+  // Build new-format specs array using spec_id/value_id from skuSpecs
+  if (!existingSpecs || !Array.isArray(existingSpecs)) existingSpecs = []
+  const specsWithIds = skuSpecs.value as any[]
+  return Object.entries(specMap).map(([name, valueName]) => {
+    const existing = existingSpecs.find((s: any) =>
+      (s.spec_name === name || s.name === name) && s.value_name === valueName)
+    if (existing && existing.spec_id) {
+      return { spec_id: existing.spec_id, value_name: valueName, value_id: existing.value_id || '' }
+    }
+    // Look up from spec definitions
+    const specDef = specsWithIds.find((s: any) => s.name === name)
+    const specId = specDef ? specDef.id : ''
+    // Find value_id from valuesList
+    let valueId = ''
+    if (specDef && specDef.valuesList) {
+      const v = specDef.valuesList.find((sv: any) => sv.valueName === valueName)
+      if (v) valueId = v.id
+    }
+    return { spec_id: specId, value_name: valueName, value_id: valueId }
+  })
 }
 
 function cartesianProduct(arrays: any[][]) {
@@ -447,10 +476,12 @@ function applyJieshunSku() {
   const jieshunSkuName = selectedSku.name || ''
   if (jieshunSkuName && target.specs) {
     ;(target.specs as any[]).forEach((sp: any) => {
-      const specDef = skuSpecs.value.find((s: any) => s.name === sp.name)
+      const specName = sp.spec_name || sp.name || ''
+      const specDef = skuSpecs.value.find((s: any) => s.name === specName)
       if (specDef && specDef.inputType === 1) {
-        sp.valueName = jieshunSkuName
-        if (target.specMap) target.specMap[sp.name] = jieshunSkuName
+        sp.value_name = jieshunSkuName
+        sp.valueName = jieshunSkuName // backward compat
+        if (target.specMap) target.specMap[specName] = jieshunSkuName
       }
     })
   }
@@ -468,7 +499,9 @@ function applySkuSelection(skuList: any[]) {
   for (const sku of skuList) {
     if (sku.specs) {
       (sku.specs as any[]).forEach((sp: any) => {
-        if (usedValues[sp.name]) usedValues[sp.name].add(sp.valueName)
+        const specName = sp.spec_name || sp.name || ''
+        const valName = sp.value_name || sp.valueName || ''
+        if (usedValues[specName] && valName) usedValues[specName].add(valName)
       })
     }
   }
@@ -574,7 +607,7 @@ watch(localSkus, () => {
     .filter((sku: any) => isSkuActive(sku))
     .map(({ specMap, ...rest }: any) => ({
       ...rest,
-      specs: Object.entries(specMap).map(([name, valueName]) => ({ name, valueName })),
+      specs: buildSpecsFromSpecMap(specMap, rest.specs),
     }))
   const json = JSON.stringify(valid)
   if (json !== lastEmittedJson) {
