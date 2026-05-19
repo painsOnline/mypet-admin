@@ -90,12 +90,23 @@
               @input="syncSingleVal" />
           </div>
           <div v-else class="opt-editor">
-            <el-tag v-for="(opt,idx) in form.inputOptions" :key="idx" closable @close="removeOpt(idx)"
-              style="margin:2px">{{ opt }}</el-tag>
+            <template v-for="(opt,idx) in form.inputOptions" :key="idx">
+              <template v-if="editingIdx === idx">
+                <span class="value-edit-wrapper" style="display:inline-flex;align-items:center;gap:4px;margin:2px">
+                  <el-input v-model="editingVal" size="small" style="width:140px"
+                    @keyup.enter="saveEditValue(idx)" @keyup.escape="cancelEditValue()"
+                    @blur="saveEditValue(idx)" />
+                  <el-button size="small" @click="saveEditValue(idx)"><el-icon><Check /></el-icon></el-button>
+                  <el-button size="small" @click="cancelEditValue()"><el-icon><Close /></el-icon></el-button>
+                </span>
+              </template>
+              <el-tag v-else @dblclick="startEditValue(idx)" closable @close="removeOpt(idx)"
+                style="margin:2px;cursor:pointer" :title="'双击编辑'">{{ opt }}</el-tag>
+            </template>
             <el-input v-model="form._batchOptions" type="textarea" :rows="4"
               placeholder="每行一个值，或用中英文逗号分隔多个值" style="width:100%"
               @blur="parseBatchOptions" />
-            <div class="form-hint">每行一个值，或用逗号分隔批量添加（支持中英文逗号）</div>
+            <div class="form-hint">每行一个值，或用逗号分隔批量添加（支持中英文逗号）| 双击标签编辑</div>
           </div>
         </el-form-item>
         <el-form-item label="排序" prop="sort">
@@ -116,9 +127,9 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
-import { getSpecsByScope, createSpec, updateSpec, deleteSpec } from '@/api'
+import { getSpecsByScope, createSpec, updateSpec, deleteSpec, renameSpecValue, deleteSpecValue, addSpecValue } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Plus, Edit, Delete, ArrowDown, Rank } from '@element-plus/icons-vue'
+import { Plus, Edit, Delete, ArrowDown, Rank, Check, Close } from '@element-plus/icons-vue'
 import Sortable from 'sortablejs'
 
 const loading = ref(false)
@@ -150,7 +161,10 @@ const submitLoading = ref(false)
 const form = reactive<any>({
   name: '', type: 2, inputType: 1, inputOptions: [] as string[],
   sort: 0, desc: '', scope: 0, _batchOptions: '', _singleVal: '',
+  _valuesList: [] as { id: string; valueName: string }[],
 })
+const editingIdx = ref(-1)
+const editingVal = ref('')
 
 const dialogTitle = computed(() => {
   if (isEdit.value) return '修改属性'
@@ -166,8 +180,9 @@ const rules = {
 function resetForm() {
   Object.assign(form, {
     name: '', type: 2, inputType: 1, inputOptions: [], sort: 0, desc: '',
-    scope: 0, _batchOptions: '', _singleVal: '',
+    scope: 0, _batchOptions: '', _singleVal: '', _valuesList: [],
   })
+  editingIdx.value = -1; editingVal.value = ''
   isEdit.value = false; editId.value = ''; currentScope.value = 0
   formRef.value?.resetFields()
 }
@@ -176,24 +191,75 @@ function syncSingleVal() {
   form.inputOptions = form._singleVal ? [form._singleVal] : []
 }
 
-function parseBatchOptions() {
+function syncBatchOptions() {
+  form._batchOptions = form.inputOptions.join('\n')
+}
+
+async function parseBatchOptions() {
   const raw = form._batchOptions?.trim()
   if (!raw) return
   const vals = raw.split(/[\n,，]+/).map((v:string) => v.trim()).filter((v:string) => v)
-  vals.forEach((v:string) => { if (!form.inputOptions.includes(v)) form.inputOptions.push(v) })
+  for (const v of vals) {
+    if (!form.inputOptions.includes(v)) {
+      form.inputOptions.push(v)
+      // If editing, immediately add to DB
+      if (isEdit.value && editId.value) {
+        try {
+          const res = await addSpecValue(editId.value, v) as any
+          form._valuesList.push({ id: res.id || '', valueName: v })
+        } catch { form.inputOptions.splice(form.inputOptions.indexOf(v), 1) }
+      }
+    }
+  }
+  syncBatchOptions()
 }
 
-function addOpt() {
-  const raw = form._newOpt?.trim()
-  if (!raw) return
-  const vals = raw.split(/[,，]/).map((v:string) => v.trim()).filter((v:string) => v)
-  vals.forEach((v:string) => { if (!form.inputOptions.includes(v)) form.inputOptions.push(v) })
-  form._newOpt = ''
-}
-
-function removeOpt(idx: number) {
+async function removeOpt(idx: number) {
   if (form.inputOptions.length <= 1) { ElMessage.warning('至少需要一个选项值'); return }
+  const vList: { id: string; valueName: string }[] = form._valuesList || []
+  if (isEdit.value && vList.length > idx && vList[idx]?.id) {
+    try { await deleteSpecValue(vList[idx].id) } catch { return }
+    vList.splice(idx, 1)
+  }
   form.inputOptions.splice(idx, 1)
+  syncBatchOptions()
+}
+
+async function startEditValue(idx: number) {
+  editingIdx.value = idx
+  editingVal.value = form.inputOptions[idx] || ''
+  await nextTick()
+  // Focus the inline input
+  const editor = document.querySelector('.value-edit-wrapper .el-input__inner') as HTMLInputElement
+  if (editor) { editor.focus(); editor.select() }
+}
+
+async function saveEditValue(idx: number) {
+  const newName = editingVal.value.trim()
+  if (!newName) { cancelEditValue(); return }
+  if (newName === form.inputOptions[idx]) { cancelEditValue(); return }
+  // Check duplicate
+  if (form.inputOptions.some((v: string, i: number) => i !== idx && v === newName)) {
+    ElMessage.warning('值名重复')
+    return
+  }
+  // If editing an existing row and we have the value ID, call rename API
+  const vList: { id: string; valueName: string }[] = form._valuesList || []
+  if (isEdit.value && vList.length > idx && vList[idx]?.id) {
+    try {
+      await renameSpecValue(vList[idx].id, newName)
+      ElMessage.success('值名已更新')
+    } catch { return }
+  }
+  form.inputOptions[idx] = newName
+  if (vList.length > idx) vList[idx].valueName = newName
+  syncBatchOptions()
+  cancelEditValue()
+}
+
+function cancelEditValue() {
+  editingIdx.value = -1
+  editingVal.value = ''
 }
 
 function handleAddSpec(cmd: string) {
@@ -209,12 +275,15 @@ function handleAddSpec(cmd: string) {
 function handleEdit(row: any) {
   isEdit.value = true; editId.value = row.id; currentScope.value = row.scope
   const opts = [...(row.inputOptions||[])]
+  const vList = (row.valuesList||[]).map((v:any) => ({ id: v.id, valueName: v.valueName }))
   Object.assign(form, {
     name: row.name, type: row.type, inputType: row.inputType,
     inputOptions: opts, sort: row.sort||0, desc: row.desc||'', scope: row.scope,
     _batchOptions: row.inputType !== 1 ? opts.join('\n') : '',
     _singleVal: row.inputType===1 ? (opts[0]||'') : '',
+    _valuesList: vList,
   })
+  editingIdx.value = -1; editingVal.value = ''
   dialogVisible.value = true
 }
 
@@ -223,7 +292,11 @@ async function handleSubmit() {
   if (!valid) return
   const data: any = {
     name: form.name, type: form.type, inputType: form.inputType,
-    inputOptions: form.inputOptions, sort: form.sort, desc: form.desc, scope: form.scope,
+    sort: form.sort, desc: form.desc, scope: form.scope,
+  }
+  if (!isEdit.value) {
+    // Only send inputOptions when creating (backend creates values from this list)
+    data.inputOptions = form.inputOptions
   }
   submitLoading.value = true
   try {

@@ -100,6 +100,18 @@ export function unlinkSpecFromType(data) {
   return request({ url: '/admin/spec/unlink', method: 'post', data })
 }
 
+export function renameSpecValue(valueId, valueName) {
+  return request({ url: `/admin/spec/values/${valueId}`, method: 'put', data: { valueName } })
+}
+
+export function deleteSpecValue(valueId) {
+  return request({ url: `/admin/spec/values/${valueId}`, method: 'delete' })
+}
+
+export function addSpecValue(specId, valueName) {
+  return request({ url: `/admin/spec/${specId}/values`, method: 'post', data: { valueName } })
+}
+
 // ---- Order ----
 export function getOrders(params) {
   return request({ url: '/admin/order', method: 'get', params })
