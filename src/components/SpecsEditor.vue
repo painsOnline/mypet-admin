@@ -26,16 +26,19 @@
       <el-table-column label="选项值" min-width="300">
         <template #default="{ row, $index }">
           <div class="options-editor">
-            <el-tag
-              v-for="(opt, oi) in (localSpecs[$index].inputOptions || [])"
-              :key="oi"
-              closable
-              size="small"
-              @close="removeOption($index, oi)"
-              class="option-tag"
-            >
-              {{ opt }}
-            </el-tag>
+            <template v-for="(opt, oi) in (localSpecs[$index].inputOptions || [])" :key="oi">
+              <span v-if="editingSpec === $index && editingOpt === oi" class="value-edit-wrapper">
+                <el-input v-model="editingValue" size="small" style="width: 100px"
+                  @keyup.enter="saveEditOption($index, oi)"
+                  @keyup.escape="cancelEditOption()"
+                  @blur="saveEditOption($index, oi)" />
+                <el-button size="small" @click="saveEditOption($index, oi)"><el-icon><Check /></el-icon></el-button>
+                <el-button size="small" @click="cancelEditOption()"><el-icon><Close /></el-icon></el-button>
+              </span>
+              <el-tag v-else @dblclick="startEditOption($index, oi)" closable
+                @close="removeOption($index, oi)" size="small" class="option-tag"
+                style="cursor:pointer" :title="'双击编辑'">{{ opt }}</el-tag>
+            </template>
             <el-input
               v-if="localSpecs[$index]._inputVisible"
               ref="optionInputRef"
@@ -75,7 +78,9 @@
 
 <script setup lang="ts">
 import { ref, reactive, watch, nextTick } from 'vue'
-import { Delete, Plus } from '@element-plus/icons-vue'
+import { Delete, Plus, Check, Close } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { renameSpecValue } from '@/api'
 
 const props = defineProps({
   specs: {
@@ -88,6 +93,9 @@ const emit = defineEmits(['update:specs'])
 
 const localSpecs = reactive([])
 const optionInputRef = ref(null)
+const editingSpec = ref(-1)
+const editingOpt = ref(-1)
+const editingValue = ref('')
 
 function deepCopy(val) {
   return JSON.parse(JSON.stringify(val || []))
@@ -155,6 +163,40 @@ function confirmOption(index) {
   }
   localSpecs[index]._inputVisible = false
   localSpecs[index]._inputValue = ''
+}
+
+function startEditOption(si: number, oi: number) {
+  editingSpec.value = si
+  editingOpt.value = oi
+  editingValue.value = localSpecs[si].inputOptions[oi] || ''
+  nextTick(() => {
+    const el = document.querySelector('.value-edit-wrapper .el-input__inner') as HTMLInputElement
+    if (el) { el.focus(); el.select() }
+  })
+}
+
+async function saveEditOption(si: number, oi: number) {
+  const newName = editingValue.value.trim()
+  if (!newName) { cancelEditOption(); return }
+  if (newName === localSpecs[si].inputOptions[oi]) { cancelEditOption(); return }
+  if (localSpecs[si].inputOptions.some((v: string, i: number) => i !== oi && v === newName)) {
+    ElMessage.warning('值名重复')
+    return
+  }
+  // If the value has an ID in valuesList, call rename API
+  const vList = (localSpecs[si] as any).valuesList
+  if (vList && vList.length > oi && vList[oi]?.id) {
+    try { await renameSpecValue(vList[oi].id, newName) } catch { return }
+    vList[oi].valueName = newName
+  }
+  localSpecs[si].inputOptions[oi] = newName
+  cancelEditOption()
+}
+
+function cancelEditOption() {
+  editingSpec.value = -1
+  editingOpt.value = -1
+  editingValue.value = ''
 }
 
 function removeOption(specIndex, optIndex) {

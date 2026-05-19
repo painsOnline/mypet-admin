@@ -212,15 +212,21 @@
               @input="specForm.inputOptions = specForm._newOption ? [specForm._newOption] : []" />
           </div>
           <div v-else class="spec-options-editor">
-            <el-tag
-              v-for="(opt, idx) in specForm.inputOptions"
-              :key="idx"
-              :closable="!isOptionUsed(opt)"
-              @close="removeSpecOption(idx)"
-              style="margin-right: 4px; margin-bottom: 4px"
-            >
-              {{ opt }}
-            </el-tag>
+            <template v-for="(opt, idx) in specForm.inputOptions" :key="idx">
+              <span v-if="editSpecOptIdx === idx" class="value-edit-row">
+                <el-input v-model="editSpecOptVal" size="small" style="width:120px"
+                  @keyup.enter="saveEditSpecOpt(idx)" @keyup.escape="cancelEditSpecOpt()"
+                  @blur="saveEditSpecOpt(idx)" />
+                <el-button size="small" @click="saveEditSpecOpt(idx)"><el-icon><Check /></el-icon></el-button>
+                <el-button size="small" @click="cancelEditSpecOpt()"><el-icon><Close /></el-icon></el-button>
+              </span>
+              <el-tag v-else @dblclick="startEditSpecOpt(idx)"
+                :closable="!isOptionUsed(opt)" @close="removeSpecOption(idx)"
+                style="margin-right: 4px; margin-bottom: 4px; cursor: pointer" :title="'双击编辑'"
+              >
+                {{ opt }}
+              </el-tag>
+            </template>
             <el-input
               v-model="specForm._batchOptions"
               type="textarea"
@@ -229,7 +235,7 @@
               style="width:100%"
               @blur="parseBatchOptions"
             />
-            <div class="form-hint">每行一个值，或用逗号分隔批量添加（支持中英文逗号）</div>
+            <div class="form-hint">每行一个值，或用逗号分隔批量添加（支持中英文逗号）| 双击标签编辑</div>
           </div>
         </el-form-item>
         <el-form-item label="排序" prop="sort">
@@ -248,9 +254,9 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { getTypes, createType, updateType, deleteType, createSpec, updateSpec, deleteSpec, getSpecsByScope, linkSpecToType, unlinkSpecFromType } from '@/api'
+import { getTypes, createType, updateType, deleteType, createSpec, updateSpec, deleteSpec, getSpecsByScope, linkSpecToType, unlinkSpecFromType, renameSpecValue, deleteSpecValue, addSpecValue } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Plus, Edit, Delete, Rank, ArrowDown } from '@element-plus/icons-vue'
+import { Plus, Edit, Delete, Rank, ArrowDown, Check, Close } from '@element-plus/icons-vue'
 import Sortable from 'sortablejs'
 
 const router = useRouter()
@@ -308,10 +314,13 @@ const specDialogTitle = computed(() => {
   return specDialogMode.value === 'sku' ? '添加SKU' : '添加私有属性'
 })
 
-const specForm = reactive({
+const specForm = reactive<any>({
   name: '', type: 1, inputType: 1, inputOptions: [] as string[], sort: 0,
   _newOption: '', _batchOptions: '', _usedOptions: [] as string[],
+  _valuesList: [] as { id: string; valueName: string }[],
 })
+const editSpecOptIdx = ref(-1)
+const editSpecOptVal = ref('')
 
 const specRules = {
   name: [{ required: true, message: '请输入规格名称', trigger: 'blur' }],
@@ -320,7 +329,9 @@ const specRules = {
 }
 
 function resetSpecForm() {
-  Object.assign(specForm, { name: '', type: 1, inputType: 1, inputOptions: [], sort: 0, _newOption: '', _batchOptions: '', _usedOptions: [] })
+  Object.assign(specForm, { name: '', type: 1, inputType: 1, inputOptions: [], sort: 0,
+    _newOption: '', _batchOptions: '', _usedOptions: [], _valuesList: [] })
+  editSpecOptIdx.value = -1; editSpecOptVal.value = ''
   specIsEdit.value = false; specEditId.value = ''; currentTypeId.value = ''
   specTypeDisabled.value = false; specDialogMode.value = 'sku'
   specFormRef.value?.resetFields()
@@ -350,35 +361,82 @@ function handleOpenEditSpec(spec: any, typeRow: any) {
   specDialogMode.value = spec.type === 1 ? 'sku' : 'prop'
   specTypeDisabled.value = true
   const options = Array.isArray(spec.inputOptions) ? [...spec.inputOptions] : []
+  const vList = (spec.valuesList || []).map((v: any) => ({ id: v.id, valueName: v.valueName }))
   Object.assign(specForm, {
     name: spec.name, type: spec.type, inputType: spec.inputType,
     inputOptions: options, sort: spec.sort || 0,
     _newOption: spec.inputType === 1 ? (options[0] || '') : '',
     _batchOptions: spec.inputType !== 1 ? (options||[]).join('\n') : '',
     _usedOptions: spec.usedOptions || [],
+    _valuesList: vList,
   })
+  editSpecOptIdx.value = -1; editSpecOptVal.value = ''
   specDialogVisible.value = true
 }
 
-function parseBatchOptions() {
+function syncSpecBatchOptions() {
+  specForm._batchOptions = specForm.inputOptions.join('\n')
+}
+
+async function parseBatchOptions() {
   const raw = specForm._batchOptions?.trim()
   if (!raw) return
   const vals = raw.split(/[\n,，]+/).map((v:string)=>v.trim()).filter((v:string)=>v)
-  vals.forEach((v:string) => { if (!specForm.inputOptions.includes(v)) specForm.inputOptions.push(v) })
+  for (const v of vals) {
+    if (!specForm.inputOptions.includes(v)) {
+      specForm.inputOptions.push(v)
+      if (specIsEdit.value && specEditId.value) {
+        try {
+          const res = await addSpecValue(specEditId.value, v) as any
+          specForm._valuesList.push({ id: res.id || '', valueName: v })
+        } catch { specForm.inputOptions.splice(specForm.inputOptions.indexOf(v), 1) }
+      }
+    }
+  }
+  syncSpecBatchOptions()
 }
 
-function addSpecOption() {
-  const raw = specForm._newOption?.trim()
-  if (!raw) return
-  const vals = raw.split(/[,，]/).map((v:string)=>v.trim()).filter((v:string)=>v)
-  vals.forEach((v:string) => { if (!specForm.inputOptions.includes(v)) specForm.inputOptions.push(v) })
-  specForm._newOption = ''
+function startEditSpecOpt(idx: number) {
+  editSpecOptIdx.value = idx
+  editSpecOptVal.value = specForm.inputOptions[idx] || ''
+  nextTick(() => {
+    const el = document.querySelector('.value-edit-row .el-input__inner') as HTMLInputElement
+    if (el) { el.focus(); el.select() }
+  })
 }
 
-function removeSpecOption(index: number) {
+async function saveEditSpecOpt(idx: number) {
+  const newName = editSpecOptVal.value.trim()
+  if (!newName) { cancelEditSpecOpt(); return }
+  if (newName === specForm.inputOptions[idx]) { cancelEditSpecOpt(); return }
+  if (specForm.inputOptions.some((v: string, i: number) => i !== idx && v === newName)) {
+    ElMessage.warning('值名重复'); return
+  }
+  const vList: { id: string; valueName: string }[] = specForm._valuesList || []
+  if (specIsEdit.value && vList.length > idx && vList[idx]?.id) {
+    try { await renameSpecValue(vList[idx].id, newName) } catch { return }
+    vList[idx].valueName = newName
+  }
+  specForm.inputOptions[idx] = newName
+  syncSpecBatchOptions()
+  cancelEditSpecOpt()
+}
+
+function cancelEditSpecOpt() {
+  editSpecOptIdx.value = -1
+  editSpecOptVal.value = ''
+}
+
+async function removeSpecOption(index: number) {
   if (specForm.inputOptions.length <= 1) { ElMessage.warning('规格值至少需要一个'); return }
   if (isOptionUsed(specForm.inputOptions[index])) { ElMessage.warning('该规格值已被商品SKU使用，无法删除'); return }
+  const vList: { id: string; valueName: string }[] = specForm._valuesList || []
+  if (specIsEdit.value && vList.length > index && vList[index]?.id) {
+    try { await deleteSpecValue(vList[index].id) } catch { return }
+    vList.splice(index, 1)
+  }
   specForm.inputOptions.splice(index, 1)
+  syncSpecBatchOptions()
 }
 
 async function handleSpecSubmit() {
@@ -389,7 +447,11 @@ async function handleSpecSubmit() {
   }
   specSubmitLoading.value = true
   try {
-    const data = { name: specForm.name, type: specForm.type, inputType: specForm.inputType, inputOptions: specForm.inputOptions, sort: specForm.sort, productType: currentTypeId.value }
+    const data: any = { name: specForm.name, type: specForm.type, inputType: specForm.inputType,
+      sort: specForm.sort, productType: currentTypeId.value }
+    if (!specIsEdit.value) {
+      data.inputOptions = specForm.inputOptions
+    }
     if (specIsEdit.value) { await updateSpec(specEditId.value, data); ElMessage.success('更新成功') }
     else { await createSpec(data); ElMessage.success('创建成功') }
     specDialogVisible.value = false
