@@ -7,6 +7,7 @@ export default defineConfig(({ mode }) => {
   const apiTarget = env.VITE_API_BASE_URL || 'http://localhost:8081'
 
   return {
+    publicDir: 'static',
     plugins: [vue()],
     resolve: {
       alias: {

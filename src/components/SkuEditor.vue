@@ -219,13 +219,15 @@ function syncEditableSpecs() {
 
 watch(skuSpecs, () => {
   syncEditableSpecs()
-  if (mounted.value) {
-    // For edit mode: pre-select only values used in existing backend SKUs
-    if (props.skus && (props.skus as any[]).length > 0) {
-      applySkuSelection(props.skus as any[])
-    }
+  if (!mounted.value) return
+  const hasBackendSkus = props.skus && (props.skus as any[]).length > 0
+  if (hasBackendSkus) {
+    // Edit mode: pre-select only values used by backend SKUs, then build from backend data
+    applySkuSelection(props.skus as any[])
+    buildSkusFromBackend(props.skus as any[])
+  } else {
+    // Create mode: generate all combinations from selected values
     rebuildSkus()
-    mergeSkus(props.skus)
   }
 }, { deep: true })
 
@@ -353,8 +355,132 @@ function rebuildSkus() {
   localSkus.splice(0, localSkus.length, ...newSkus)
 }
 
+// Populate localSkus from backend SKU data (edit mode) — only show filled combinations
+function buildSkusFromBackend(skuList: any[]) {
+  if (!skuList || skuList.length === 0) { localSkus.splice(0, localSkus.length); return }
+  const specsWithIds = skuSpecs.value as any[]
+  const newSkus: any[] = []
+  for (const bs of skuList) {
+    if (!bs.specs || !Array.isArray(bs.specs) || bs.specs.length === 0) continue
+    // Rebuild each spec from backend data, resolving value_name from valueId if needed
+    const specs: any[] = (bs.specs as any[]).map((sp: any) => {
+      let specName = ''
+      let specId = sp.specId || ''
+      if (!specId) {
+        // Try to find specId from specName
+        const specDef = specsWithIds.find((s: any) => s.name === (sp.specName || sp.spec_name || sp.name))
+        if (specDef) specId = specDef.id
+      }
+      if (specId) {
+        const specDef = specsWithIds.find((s: any) => s.id === specId)
+        if (specDef) specName = specDef.name
+      } else {
+        specName = sp.specName || sp.spec_name || sp.name || ''
+      }
+      let valueName = sp.valueName || sp.value_name || sp.valueName || ''
+      if (!valueName && sp.valueId && specId) {
+        const specDef = specsWithIds.find((s: any) => s.id === specId)
+        if (specDef && specDef.valuesList) {
+          const v = specDef.valuesList.find((sv: any) => sv.id === sp.valueId)
+          if (v) valueName = v.valueName
+        }
+      }
+      return {
+        spec_id: specId,
+        spec_name: specName,
+        value_name: valueName,
+        value_id: sp.valueId || '',
+      }
+    })
+    const specMap: Record<string, string> = {}
+    specs.forEach((s: any) => { if (s.spec_name) specMap[s.spec_name] = s.value_name })
+    newSkus.push({
+      price: bs.price || 0,
+      oldPrice: bs.oldPrice || 0,
+      costPrice: bs.costPrice || 0,
+      inventory: bs.inventory || 0,
+      barcode: bs.barcode || '',
+      picture: bs.picture || '',
+      specs,
+      specMap,
+    })
+  }
+  localSkus.splice(0, localSkus.length, ...newSkus)
+}
+
 function generateCombinations() {
-  rebuildSkus()
+  const hasBackendSkus = props.skus && (props.skus as any[]).length > 0
+  if (hasBackendSkus) {
+    // Edit mode: merge backend SKUs with new combos from checked values
+    const specsWithSelection = editableSpecs.filter((s: any) => {
+      const sel: number[] = s._selected || []
+      return sel.length > 0 && (s.inputOptions || []).length > 0
+    })
+    if (specsWithSelection.length === 0) { localSkus.splice(0, localSkus.length); return }
+    // Build all possible combos from selected values
+    const allCombos = allCombinations(specsWithSelection)
+    // Build existing backend SKU specs for matching
+    const backendSpecMaps: Record<string, any>[] = []
+    for (const bs of (props.skus as any[])) {
+      if (!bs.specs || !Array.isArray(bs.specs)) continue
+      const sm: Record<string, string> = {}
+      ;(bs.specs as any[]).forEach((sp: any) => {
+        const sn = sp.specName || sp.spec_name || sp.name || ''
+        if (sn) sm[sn] = sp.valueName || sp.value_name || sp.valueName || ''
+      })
+      backendSpecMaps.push(sm)
+    }
+    // Build old map from current localSkus to preserve filled data
+    const oldMap = new Map()
+    for (const sku of localSkus) {
+      const key = specsWithSelection.map((s: any) => (sku.specMap && sku.specMap[s.name]) || '').join('||')
+      oldMap.set(key, sku)
+    }
+    const newSkus = allCombos.map((combo: any[]) => {
+      const specMap: Record<string, string> = {}
+      combo.forEach(({ spec_name, value_name }) => { specMap[spec_name] = value_name })
+      const key = specsWithSelection.map((s: any) => specMap[s.name] || '').join('||')
+      const old = oldMap.get(key)
+      // Check if this combo is in backend SKUs
+      const isBackend = backendSpecMaps.some((bsm: Record<string, string>) => {
+        for (const sn of Object.keys(bsm)) {
+          if (specMap[sn] !== bsm[sn]) return false
+        }
+        return Object.keys(bsm).length > 0
+      })
+      return {
+        price: old ? old.price : 0,
+        oldPrice: old ? old.oldPrice : 0,
+        costPrice: old ? old.costPrice : 0,
+        inventory: old ? old.inventory : 0,
+        barcode: old ? old.barcode : '',
+        picture: old ? old.picture : '',
+        specs: combo,
+        specMap,
+        _isBackend: isBackend,
+      }
+    })
+    // Filter: only show backend SKUs + newly checked combos (not inherited from old generation)
+    const keep = newSkus.filter((s: any) => s._isBackend || s.price > 0 || s.oldPrice > 0 || s.costPrice > 0 || s.inventory > 0 || s.picture || s.barcode)
+    localSkus.splice(0, localSkus.length, ...(keep.length > 0 ? keep : newSkus))
+  } else {
+    rebuildSkus()
+  }
+}
+
+/** Build all Cartesian combinations from selected spec values. */
+function allCombinations(specsWithSelection: any[]) {
+  const arrays = specsWithSelection.map((s: any) => {
+    const sel: number[] = s._selected || []
+    const vals = s.valuesList || []
+    return sel.map((i: number) => ({
+      spec_id: s.id,
+      spec_name: s.name,
+      value_name: s.inputOptions[i],
+      value_id: (vals[i]) ? vals[i].id : ''
+    }))
+  })
+  return cartesianProduct(arrays)
 }
 
 function buildSpecsFromSpecMap(specMap: Record<string, string>, existingSpecs: any[]) {
@@ -496,22 +622,33 @@ function applySkuSelection(skuList: any[]) {
   for (const spec of skuSpecs.value) {
     usedValues[spec.name] = new Set()
   }
-  // Build a map from specId to spec name for matching
+  // Build lookup maps
   const specIdToName: Record<string, string> = {}
+  const valueIdToName: Record<string, string> = {}
+  const specNameToDef: Record<string, any> = {}
   for (const spec of skuSpecs.value) {
     if (spec.id) specIdToName[spec.id] = spec.name
+    if (spec.name) specNameToDef[spec.name] = spec
+    if (spec.valuesList) {
+      for (const v of spec.valuesList) {
+        if (v.id) valueIdToName[v.id] = v.valueName
+      }
+    }
   }
   for (const sku of skuList) {
     if (sku.specs) {
       (sku.specs as any[]).forEach((sp: any) => {
-        // Match spec by specId first (most reliable), then by specName/name
         let specName = ''
         if (sp.specId && specIdToName[sp.specId]) {
           specName = specIdToName[sp.specId]
         } else {
           specName = sp.specName || sp.spec_name || sp.name || ''
         }
-        const valName = sp.valueName || sp.value_name || sp.valueName || ''
+        // valueName may be empty for non-unique specs; resolve from valueId
+        let valName = sp.valueName || sp.value_name || ''
+        if ((!valName || valName === '') && sp.valueId) {
+          valName = valueIdToName[sp.valueId] || ''
+        }
         if (usedValues[specName] && valName) usedValues[specName].add(valName)
       })
     }
