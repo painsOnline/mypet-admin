@@ -711,18 +711,30 @@ async function loadProduct(id) {
 
     properties.splice(0, properties.length)
     if (p.properties && p.properties.length > 0) {
-      p.properties.forEach((pp) => {
-        const spec = displaySpecs.value.find(s => s.name === pp.name)
-        const rawValue = pp.valueName || pp.value || ''
+      // Group multi-select properties by specName
+      const grouped: Record<string, { specName: string; valueNames: string[]; spec: any }> = {}
+      for (const pp of p.properties) {
+        const specName = pp.specName || pp.name || ''
+        const spec = displaySpecs.value.find(s => s.name === specName)
+        const isMulti = spec && spec.inputType === 3
+        const key = specName || (pp.specId || '')
+        if (!grouped[key]) {
+          grouped[key] = { specName, valueNames: [], spec }
+        }
+        const vn = pp.valueName || pp.value || ''
+        if (vn) grouped[key].valueNames.push(vn)
+      }
+      for (const g of Object.values(grouped)) {
+        const spec = g.spec
+        const isMulti = spec && spec.inputType === 3
         properties.push({
-          name: pp.name,
-          productType: pp.productType || p.productType,
+          name: g.specName,
+          productType: p.productType,
           inputType: spec ? spec.inputType : 1,
           options: spec ? (spec.inputOptions || []) : [],
-          value: spec && spec.inputType === 3 && typeof rawValue === 'string'
-            ? rawValue.split(',').filter(v => v) : rawValue,
+          value: isMulti ? g.valueNames : (g.valueNames[0] || ''),
         })
-      })
+      }
     }
   } catch (e) {
     console.error('loadProduct failed:', e)

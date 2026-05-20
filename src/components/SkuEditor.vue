@@ -496,11 +496,22 @@ function applySkuSelection(skuList: any[]) {
   for (const spec of skuSpecs.value) {
     usedValues[spec.name] = new Set()
   }
+  // Build a map from specId to spec name for matching
+  const specIdToName: Record<string, string> = {}
+  for (const spec of skuSpecs.value) {
+    if (spec.id) specIdToName[spec.id] = spec.name
+  }
   for (const sku of skuList) {
     if (sku.specs) {
       (sku.specs as any[]).forEach((sp: any) => {
-        const specName = sp.spec_name || sp.name || ''
-        const valName = sp.value_name || sp.valueName || ''
+        // Match spec by specId first (most reliable), then by specName/name
+        let specName = ''
+        if (sp.specId && specIdToName[sp.specId]) {
+          specName = specIdToName[sp.specId]
+        } else {
+          specName = sp.specName || sp.spec_name || sp.name || ''
+        }
+        const valName = sp.valueName || sp.value_name || sp.valueName || ''
         if (usedValues[specName] && valName) usedValues[specName].add(valName)
       })
     }
@@ -523,15 +534,58 @@ function applySkuSelection(skuList: any[]) {
 function mergeSkus(skuList: any[]) {
   if (!skuList || skuList.length === 0) return
 
-  // Merge from backend SKU data into local SKUs by index
-  for (let i = 0; i < Math.min(skuList.length, localSkus.length); i++) {
-    const bs = skuList[i]
-    localSkus[i].price = bs.price || 0
-    localSkus[i].oldPrice = bs.oldPrice || 0
-    localSkus[i].costPrice = bs.costPrice || 0
-    localSkus[i].inventory = bs.inventory || 0
-    localSkus[i].barcode = bs.barcode || ''
-    localSkus[i].picture = bs.picture || ''
+  // Build a map from specId to spec name for matching
+  const specIdToName: Record<string, string> = {}
+  for (const spec of skuSpecs.value) {
+    if (spec.id) specIdToName[spec.id] = spec.name
+  }
+
+  // Match backend SKUs to local SKUs by specId+valueId (most reliable) or specName+valueName
+  for (const bs of skuList) {
+    if (!bs.specs || !Array.isArray(bs.specs) || bs.specs.length === 0) continue
+    // Find matching local SKU: compare each spec in backend SKU against each spec in local SKU
+    const matchIdx = localSkus.findIndex((ls: any) => {
+      const lsSpecs: any[] = ls.specs || []
+      if (lsSpecs.length === 0) return false
+      // Every backend spec must match a local spec
+      return (bs.specs as any[]).every((bsSp: any) => {
+        return lsSpecs.some((lsSp: any) => {
+          // Match by specId first, then by name
+          const sameSpec = (bsSp.specId && lsSp.spec_id && bsSp.specId === lsSp.spec_id)
+            || (bsSp.specName && lsSp.spec_name && bsSp.specName === lsSp.spec_name)
+          if (!sameSpec) return false
+          // Match by valueId first (reliable), then by valueName (may be empty for non-unique)
+          const bsVid = bsSp.valueId || ''
+          const lsVid = lsSp.value_id || ''
+          if (bsVid && lsVid && bsVid === lsVid) return true
+          const bsVn = bsSp.valueName || bsSp.value_name || ''
+          const lsVn = lsSp.value_name || ''
+          if (bsVn && lsVn && bsVn === lsVn) return true
+          return false
+        })
+      })
+    })
+    if (matchIdx >= 0) {
+      localSkus[matchIdx].price = bs.price || 0
+      localSkus[matchIdx].oldPrice = bs.oldPrice || 0
+      localSkus[matchIdx].costPrice = bs.costPrice || 0
+      localSkus[matchIdx].inventory = bs.inventory || 0
+      localSkus[matchIdx].barcode = bs.barcode || ''
+      localSkus[matchIdx].picture = bs.picture || ''
+    }
+  }
+  // If no spec-based matches worked, fall back to index merging
+  const anyMatched = localSkus.some((ls: any) => ls.price > 0 || ls.oldPrice > 0)
+  if (!anyMatched) {
+    for (let i = 0; i < Math.min(skuList.length, localSkus.length); i++) {
+      const bs = skuList[i]
+      localSkus[i].price = bs.price || 0
+      localSkus[i].oldPrice = bs.oldPrice || 0
+      localSkus[i].costPrice = bs.costPrice || 0
+      localSkus[i].inventory = bs.inventory || 0
+      localSkus[i].barcode = bs.barcode || ''
+      localSkus[i].picture = bs.picture || ''
+    }
   }
 }
 
