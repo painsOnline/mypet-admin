@@ -12,6 +12,9 @@
         <el-form-item label="店铺Logo" prop="logo">
           <ImageUploader v-model="shopForm.logo" category="logo" />
         </el-form-item>
+        <el-form-item label="联系电话" prop="contact">
+          <el-input v-model="shopForm.contact" placeholder="请输入联系电话" style="width: 280px" maxlength="20" />
+        </el-form-item>
         <el-form-item label="起配金额" prop="freeShippingAmount">
           <el-input-number v-model="shopForm.freeShippingAmount" :min="0" :precision="2" style="width: 200px" />
           <span style="margin-left: 8px; color: #909399">订单满此金额起配</span>
@@ -67,8 +70,11 @@ const shopFormRef = ref(null)
 const shopSaveLoading = ref(false)
 const bannerListRef = ref(null)
 
-const shopForm = reactive({ name: '', logo: '', freeShippingAmount: 20, banners: '', detail: '' })
+const shopForm = reactive({ name: '', logo: '', contact: '', freeShippingAmount: 20, banners: '', detail: '' })
 const shopRules = {
+  contact: [
+    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号码', trigger: 'blur' },
+  ],
   freeShippingAmount: [
     { required: true, message: '请输入起配金额', trigger: 'blur' },
     { type: 'number', min: 0, message: '起配金额不能小于0', trigger: 'blur' },
@@ -119,7 +125,7 @@ async function loadShopSettings() {
   try {
     const s = await getShopSettings()
     if (s) {
-      Object.assign(shopForm, { name: s.name || '', logo: s.logo || '', freeShippingAmount: s.freeShippingAmount || 0, banners: s.banners || '', detail: s.detail || '' })
+      Object.assign(shopForm, { name: s.name || '', logo: s.logo || '', contact: s.contact || '', freeShippingAmount: s.freeShippingAmount || 0, banners: s.banners || '', detail: s.detail || '' })
       // Parse banners JSON
       try {
         const arr = typeof s.banners === 'string' ? JSON.parse(s.banners) : (s.banners || [])
@@ -139,6 +145,7 @@ async function handleSaveShop() {
   try {
     await saveShopSettings({
       name: shopForm.name, logo: shopForm.logo,
+      contact: shopForm.contact,
       freeShippingAmount: shopForm.freeShippingAmount,
       banners: JSON.stringify(bannerItems.value.map(b => ({ imgUrl: b.imgUrl, hrefUrl: b.hrefUrl, type: 1, sort: b.sort }))),
       detail: shopForm.detail,
