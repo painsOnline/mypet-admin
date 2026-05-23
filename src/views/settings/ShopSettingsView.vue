@@ -38,6 +38,11 @@
           </div>
           <div v-if="bannerItems.length === 0" class="form-hint">暂无Banner，点击"添加Banner"按钮添加</div>
         </el-form-item>
+        <el-form-item label="店铺详情">
+          <div class="detail-editor-wrapper">
+            <RichTextEditor v-model="shopForm.detail" />
+          </div>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" :loading="shopSaveLoading" @click="handleSaveShop">
             保存设置
@@ -54,6 +59,7 @@ import { getShopSettings, saveShopSettings } from '@/api'
 import { ElMessage } from 'element-plus'
 import { Plus, Delete, Rank } from '@element-plus/icons-vue'
 import ImageUploader from '@/components/ImageUploader.vue'
+import RichTextEditor from '@/components/RichTextEditor.vue'
 import request from '@/api/request'
 import Sortable from 'sortablejs'
 
@@ -61,7 +67,7 @@ const shopFormRef = ref(null)
 const shopSaveLoading = ref(false)
 const bannerListRef = ref(null)
 
-const shopForm = reactive({ name: '', logo: '', freeShippingAmount: 20, banners: '' })
+const shopForm = reactive({ name: '', logo: '', freeShippingAmount: 20, banners: '', detail: '' })
 const shopRules = {
   freeShippingAmount: [
     { required: true, message: '请输入起配金额', trigger: 'blur' },
@@ -113,7 +119,7 @@ async function loadShopSettings() {
   try {
     const s = await getShopSettings()
     if (s) {
-      Object.assign(shopForm, { name: s.name || '', logo: s.logo || '', freeShippingAmount: s.freeShippingAmount || 0, banners: s.banners || '' })
+      Object.assign(shopForm, { name: s.name || '', logo: s.logo || '', freeShippingAmount: s.freeShippingAmount || 0, banners: s.banners || '', detail: s.detail || '' })
       // Parse banners JSON
       try {
         const arr = typeof s.banners === 'string' ? JSON.parse(s.banners) : (s.banners || [])
@@ -135,6 +141,7 @@ async function handleSaveShop() {
       name: shopForm.name, logo: shopForm.logo,
       freeShippingAmount: shopForm.freeShippingAmount,
       banners: JSON.stringify(bannerItems.value.map(b => ({ imgUrl: b.imgUrl, hrefUrl: b.hrefUrl, type: 1, sort: b.sort }))),
+      detail: shopForm.detail,
     })
     ElMessage.success('保存成功')
   } catch (e) { /* handled */ } finally { shopSaveLoading.value = false }
@@ -157,4 +164,5 @@ h3 { margin: 0; font-size: 18px; color: #303133; }
 .banner-upload :deep(.el-upload) { width: 100px; }
 .banner-upload :deep(.el-upload-dragger) { width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; padding: 0; }
 .form-hint { color: #909399; font-size: 12px; margin-top: 4px; }
+.detail-editor-wrapper { width: 100%; max-width: 900px; }
 </style>

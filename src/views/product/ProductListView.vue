@@ -148,6 +148,7 @@
 </template>
 
 <script setup lang="ts">
+defineOptions({ name: 'ProductList' })
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getProducts, getCategories, getTypes, getBrands, toggleHotProduct, toggleProductEnable, deleteProduct } from '@/api'

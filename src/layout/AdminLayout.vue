@@ -112,7 +112,13 @@
           <el-button type="danger" size="small" text @click="handleLogout">退出</el-button>
         </div>
       </el-header>
-      <el-main><router-view /></el-main>
+      <el-main>
+        <router-view v-slot="{ Component }">
+          <keep-alive :include="cachedViews">
+            <component :is="Component" />
+          </keep-alive>
+        </router-view>
+      </el-main>
     </el-container>
   </el-container>
 </template>
@@ -129,6 +135,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const activeMenu = computed(() => route.path)
+const cachedViews = ref(['ProductList'])
 const shopName = ref('')
 const shopTitle = computed(() => shopName.value ? `宠物社区私域-${shopName.value}` : '宠物社区私域')
 

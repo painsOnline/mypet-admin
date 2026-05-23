@@ -3,7 +3,10 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <h3>{{ isCreate ? '新增商品' : '编辑商品' }}</h3>
+          <div style="display:flex;align-items:center;gap:12px">
+            <el-button @click="goBack" :icon="ArrowLeft" text>返回</el-button>
+            <h3 style="margin:0">{{ isCreate ? '新增商品' : '编辑商品' }}</h3>
+          </div>
           <el-button type="success" @click="openJieshunDialog">
             <el-icon><Download /></el-icon> {{ isCreate ? '从街顺导入商品' : '从街顺同步商品' }}
           </el-button>
@@ -220,7 +223,7 @@ import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { getProductDetail, createProduct, updateProduct, getCategories, getTypes, getBrands, createBrand, jieshunSearch, jieshunDetail } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Delete, Download, DArrowRight, SuccessFilled, CircleCloseFilled, WarningFilled } from '@element-plus/icons-vue'
+import { ArrowLeft, Plus, Delete, Download, DArrowRight, SuccessFilled, CircleCloseFilled, WarningFilled } from '@element-plus/icons-vue'
 import ImageUploader from '@/components/ImageUploader.vue'
 import SkuEditor from '@/components/SkuEditor.vue'
 import RichTextEditor from '@/components/RichTextEditor.vue'
@@ -233,6 +236,10 @@ const props = defineProps({
 })
 
 const router = useRouter()
+
+function goBack() {
+  router.back()
+}
 
 const isCreate = computed(() => !props.id || props.id === 'new')
 const formRef = ref(null)
