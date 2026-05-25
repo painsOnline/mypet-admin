@@ -464,10 +464,6 @@ async function handleDeleteSpec(spec, typeRow) {
     ElMessage.warning('每个类型至少有一个SKU，不能删除')
     return
   }
-  if (spec.type === 1 && typeRow.productCount > 0) {
-    ElMessage.warning('该SKU已有商品使用，无法删除')
-    return
-  }
   try {
     if (spec.scope === 1) {
       await unlinkSpecFromType({ typeId: typeRow.id, specsId: spec.id })
