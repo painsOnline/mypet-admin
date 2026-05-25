@@ -37,7 +37,7 @@
                   <el-table-column label="操作" width="140" fixed="right">
                     <template #default="{ row: spec }">
                       <el-button type="primary" size="small" @click="handleOpenEditSpec(spec,row)"><el-icon><Edit /></el-icon>编辑</el-button>
-                      <el-popconfirm v-if="canDeleteSkuSpec(row,spec)" title="确定删除？" @confirm="handleDeleteSpec(spec,row)">
+                      <el-popconfirm title="确定删除？" @confirm="handleDeleteSpec(spec,row)">
                         <template #reference>
                           <el-button type="danger" size="small"><el-icon><Delete /></el-icon>删除</el-button>
                         </template>
@@ -460,6 +460,14 @@ async function handleSpecSubmit() {
 }
 
 async function handleDeleteSpec(spec, typeRow) {
+  if (spec.type === 1 && isOnlySkuSpec(typeRow, spec)) {
+    ElMessage.warning('每个类型至少有一个SKU，不能删除')
+    return
+  }
+  if (spec.type === 1 && typeRow.productCount > 0) {
+    ElMessage.warning('该SKU已有商品使用，无法删除')
+    return
+  }
   try {
     if (spec.scope === 1) {
       await unlinkSpecFromType({ typeId: typeRow.id, specsId: spec.id })

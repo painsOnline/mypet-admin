@@ -8,18 +8,23 @@
         <table class="sku-table">
           <thead>
             <tr>
+              <th style="width:50px">使用</th>
               <th style="width:120px">规格名称</th>
               <th>规格值</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="spec in editableSpecs" :key="spec.id">
-              <td style="font-weight:500;color:#303133">{{ spec.name }}</td>
+            <tr v-for="spec in editableSpecs" :key="spec.id" :class="{ 'spec-disabled': !spec._enabled }">
+              <td style="text-align:center">
+                <el-checkbox v-model="spec._enabled" @change="onSpecEnabledChange(spec)" />
+              </td>
+              <td :style="{ fontWeight: spec._enabled ? 500 : 400, color: spec._enabled ? '#303133' : '#c0c4cc' }">{{ spec.name }}</td>
               <td style="text-align:left">
                 <!-- 唯一值: single text input for manual entry -->
                 <span v-if="spec.inputType === 1" class="spec-values-cell">
                   <el-input
                     :model-value="spec.inputOptions[0] || ''"
+                    :disabled="!spec._enabled"
                     @update:model-value="(v: string) => { spec.inputOptions[0] = v; syncSpecToBackend(spec); generateCombinations() }"
                     size="small" style="width:200px" placeholder="请输入规格值"
                   />
@@ -30,15 +35,15 @@
                     v-for="(val, vi) in spec.inputOptions"
                     :key="vi"
                     class="spec-value-tag"
-                    :class="{ 'spec-value-off': !isValueSelected(spec, val) }"
-                    @click="toggleSpecValue(spec, vi)"
-                    @mouseenter="spec._hoverIdx = vi"
+                    :class="{ 'spec-value-off': !isValueSelected(spec, val), 'spec-value-disabled': !spec._enabled }"
+                    @click="spec._enabled && toggleSpecValue(spec, vi)"
+                    @mouseenter="spec._enabled && (spec._hoverIdx = vi)"
                     @mouseleave="spec._hoverIdx = -1"
                   >
                     <el-icon v-if="isValueSelected(spec, val)" class="value-check-icon"><Check /></el-icon>
                     {{ val }}
                     <el-icon
-                      v-show="spec._hoverIdx === vi"
+                      v-show="spec._hoverIdx === vi && spec._enabled"
                       class="value-delete-icon"
                       @click.stop="removeSpecValue(spec, vi)"
                     ><Close /></el-icon>
@@ -49,7 +54,7 @@
                     <el-button size="small" type="primary" @click="confirmAddSpecValue(spec)">确定</el-button>
                     <el-button size="small" @click="cancelAddSpecValue(spec)">取消</el-button>
                   </span>
-                  <el-button v-else size="small" @click="startAddSpecValue(spec)">
+                  <el-button v-else size="small" :disabled="!spec._enabled" @click="startAddSpecValue(spec)">
                     <el-icon><Plus /></el-icon>添加规格值
                   </el-button>
                 </span>
@@ -196,22 +201,40 @@ onMounted(() => { mounted.value = true })
 
 const skuSpecs = computed(() => (props.specs as any[]).filter((s: any) => s.type === 1))
 
-// Tracks which specs have selected values (for SKU table header columns)
+// Tracks which specs have selected values AND are enabled (for SKU table header columns)
 const activeSpecs = computed(() => {
-  return editableSpecs.filter((s: any) => (s._selected || []).length > 0)
+  return editableSpecs.filter((s: any) => s._enabled && (s._selected || []).length > 0)
 })
+
+function onSpecEnabledChange(spec: any) {
+  if (!spec._enabled) {
+    // Unchecking the spec: clear all selected values for this spec
+    spec._selected = []
+  } else {
+    // Checking the spec: select all values by default
+    spec._selected = (spec.inputOptions || []).map((_: any, i: number) => i)
+  }
+  generateCombinations()
+}
 
 const editableSpecs: any[] = reactive([])
 
 function syncEditableSpecs() {
   const arr = JSON.parse(JSON.stringify(skuSpecs.value))
+  const hasBackendSkus = props.skus && (props.skus as any[]).length > 0
   arr.forEach((s: any) => {
     s._hoverIdx = -1
     s._adding = false
     s._newVal = ''
-    // _selected tracks which value indices are selected (default: all)
+    if (!s._enabled) s._enabled = false
+    // _selected tracks which value indices are selected
     if (!s._selected || s._selected.length === 0) {
-      s._selected = (s.inputOptions || []).map((_: any, i: number) => i)
+      // Create mode: none pre-selected; edit mode: select all for enabled specs, none for others
+      if (hasBackendSkus) {
+        s._selected = []
+      } else {
+        s._selected = []
+      }
     }
   })
   editableSpecs.splice(0, editableSpecs.length, ...arr)
@@ -222,18 +245,17 @@ watch(skuSpecs, () => {
   if (!mounted.value) return
   const hasBackendSkus = props.skus && (props.skus as any[]).length > 0
   if (hasBackendSkus) {
-    // Edit mode: pre-select only values used by backend SKUs, then build from backend data
     applySkuSelection(props.skus as any[])
     buildSkusFromBackend(props.skus as any[])
   } else {
-    // Create mode: generate all combinations from selected values
-    rebuildSkus()
+    // Create mode: no pre-generated combinations, user selects specs and values first
+    localSkus.splice(0, localSkus.length)
   }
 }, { deep: true })
 
 onMounted(() => {
   syncEditableSpecs()
-  rebuildSkus()
+  localSkus.splice(0, localSkus.length)
 })
 
 // ---- Value selection ----
@@ -656,14 +678,14 @@ function applySkuSelection(skuList: any[]) {
   for (const spec of editableSpecs) {
     const used = usedValues[spec.name]
     if (used && used.size > 0) {
+      spec._enabled = true
       spec._selected = []
       ;(spec.inputOptions || []).forEach((val: string, i: number) => {
         if (used.has(val)) spec._selected.push(i)
       })
-    }
-    // Ensure at least one selected per spec
-    if (!spec._selected || spec._selected.length === 0) {
-      spec._selected = [0]
+    } else {
+      spec._enabled = false
+      spec._selected = []
     }
   }
 }
@@ -831,6 +853,12 @@ watch(localSkus, () => {
 .spec-value-tag.spec-value-off:hover {
   border-color: #c0c4cc;
 }
+
+.spec-value-tag.spec-value-disabled {
+  background: #fafafa; border-color: #ebeef5; color: #c0c4cc; cursor: not-allowed; pointer-events: none;
+}
+
+.spec-disabled td { background: #fafafa; }
 
 .value-check-icon {
   font-size: 12px; color: #409eff;
