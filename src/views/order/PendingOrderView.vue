@@ -138,7 +138,12 @@
               <el-descriptions :column="1" border size="small">
                 <el-descriptions-item label="总金额">¥{{ orderDetail.totalMoney }}</el-descriptions-item>
                 <el-descriptions-item label="应收金额">¥{{ orderDetail.payMoney }}</el-descriptions-item>
-                <el-descriptions-item label="实收金额">¥{{ orderDetail.actualPayMoney }}</el-descriptions-item>
+                <el-descriptions-item label="实收金额">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <el-input v-model="actualPayMoneyDraft" placeholder="实收金额" style="width:160px" />
+                    <el-button type="primary" size="small" @click="saveActualPayMoney">保存</el-button>
+                  </div>
+                </el-descriptions-item>
               </el-descriptions>
             </el-card>
           </el-tab-pane>
@@ -182,7 +187,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getPendingOrders, getOrderDetail, dispatchOrder, batchDispatchOrder, batchCancelOrder, confirmReceipt, approveRefund, rejectRefund, cancelOrder, updateSellerMessage } from '@/api'
+import { getPendingOrders, getOrderDetail, dispatchOrder, batchDispatchOrder, batchCancelOrder, confirmReceipt, approveRefund, rejectRefund, cancelOrder, updateSellerMessage, updateActualPayMoney } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown, Phone, UserFilled } from '@element-plus/icons-vue'
 
@@ -194,6 +199,7 @@ const detailVisible = ref(false)
 const orderDetail = ref<any>(null)
 const activeTab = ref('info')
 const sellerMessageDraft = ref('')
+const actualPayMoneyDraft = ref('')
 
 const sortState = reactive({ sortBy: 'modifyTime', sortOrder: 'desc' })
 const pagination = reactive({ page: 1, pageSize: 12, counts: 0, pages: 0 })
@@ -230,6 +236,7 @@ async function openDetail(id: string) {
   try {
     orderDetail.value = await getOrderDetail(id)
     sellerMessageDraft.value = orderDetail.value?.sellerMessage || ''
+    actualPayMoneyDraft.value = orderDetail.value?.actualPayMoney ?? ''
   } catch { /* ignore */ }
 }
 
@@ -239,6 +246,20 @@ async function saveSellerMessage() {
     await updateSellerMessage(orderDetail.value.id, sellerMessageDraft.value)
     orderDetail.value.sellerMessage = sellerMessageDraft.value
     ElMessage.success('卖家备注已保存')
+  } catch { /* ignore */ }
+}
+
+async function saveActualPayMoney() {
+  if (!orderDetail.value) return
+  const val = parseFloat(actualPayMoneyDraft.value)
+  if (isNaN(val) || val < 0) {
+    ElMessage.warning('请输入有效金额')
+    return
+  }
+  try {
+    await updateActualPayMoney(orderDetail.value.id, val.toFixed(2))
+    orderDetail.value.actualPayMoney = val.toFixed(2)
+    ElMessage.success('实收金额已保存')
   } catch { /* ignore */ }
 }
 

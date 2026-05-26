@@ -25,7 +25,7 @@
                   <el-input
                     :model-value="spec.inputOptions[0] || ''"
                     :disabled="!spec._enabled"
-                    @update:model-value="(v: string) => { spec.inputOptions[0] = v; syncSpecToBackend(spec); generateCombinations() }"
+                    @update:model-value="(v: string) => { spec.inputOptions[0] = v; if (v) spec._selected = [0]; syncSpecToBackend(spec); generateCombinations() }"
                     size="small" style="width:200px" placeholder="请输入规格值"
                   />
                 </span>
@@ -203,8 +203,16 @@ const skuSpecs = computed(() => (props.specs as any[]).filter((s: any) => s.type
 
 // Tracks which specs have selected values AND are enabled (for SKU table header columns)
 const activeSpecs = computed(() => {
-  return editableSpecs.filter((s: any) => s._enabled && (s._selected || []).length > 0)
+  return editableSpecs.filter((s: any) => hasSpecSelection(s))
 })
+
+function hasSpecSelection(spec: any): boolean {
+  if (!spec._enabled) return false
+  // Unique-value: check if input has a value
+  if (spec.inputType === 1) return !!(spec.inputOptions && spec.inputOptions[0])
+  // Single/multi select: check _selected array
+  return (spec._selected || []).length > 0 && (spec.inputOptions || []).length > 0
+}
 
 function onSpecEnabledChange(spec: any) {
   if (!spec._enabled) {
@@ -212,7 +220,12 @@ function onSpecEnabledChange(spec: any) {
     spec._selected = []
   } else {
     // Checking the spec: select all values by default
-    spec._selected = (spec.inputOptions || []).map((_: any, i: number) => i)
+    // For unique-value, always select index 0 (single input value)
+    if (spec.inputType === 1) {
+      spec._selected = [0]
+    } else {
+      spec._selected = (spec.inputOptions || []).map((_: any, i: number) => i)
+    }
   }
   generateCombinations()
 }
@@ -331,11 +344,8 @@ async function removeSpecValue(spec: any, index: number) {
 
 function rebuildSkus() {
   if (!mounted.value) return
-  // Only use specs with selected values
-  const specsWithSelection = editableSpecs.filter((s: any) => {
-    const sel: number[] = s._selected || []
-    return sel.length > 0 && (s.inputOptions || []).length > 0
-  })
+  // Only use specs with selected values (unique-value uses inputOptions[0])
+  const specsWithSelection = editableSpecs.filter((s: any) => hasSpecSelection(s))
   if (specsWithSelection.length === 0) {
     localSkus.splice(0, localSkus.length)
     return
@@ -434,10 +444,7 @@ function generateCombinations() {
   const hasBackendSkus = props.skus && (props.skus as any[]).length > 0
   if (hasBackendSkus) {
     // Edit mode: merge backend SKUs with new combos from checked values
-    const specsWithSelection = editableSpecs.filter((s: any) => {
-      const sel: number[] = s._selected || []
-      return sel.length > 0 && (s.inputOptions || []).length > 0
-    })
+    const specsWithSelection = editableSpecs.filter((s: any) => hasSpecSelection(s))
     if (specsWithSelection.length === 0) { localSkus.splice(0, localSkus.length); return }
     // Build all possible combos from selected values
     const allCombos = allCombinations(specsWithSelection)

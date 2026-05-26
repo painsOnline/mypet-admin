@@ -157,6 +157,10 @@ export function updateSellerMessage(id, sellerMessage) {
   return request({ url: `/admin/order/${id}/sellerMessage`, method: 'put', data: { sellerMessage } })
 }
 
+export function updateActualPayMoney(id, actualPayMoney) {
+  return request({ url: `/admin/order/${id}/actualPayMoney`, method: 'put', data: { actualPayMoney } })
+}
+
 // ---- Brand ----
 export function getBrands() {
   return request({ url: '/admin/brand', method: 'get' })
