@@ -79,6 +79,7 @@
               <th>原价</th>
               <th>成本价</th>
               <th>库存</th>
+              <th>真实库存</th>
               <th>条形码</th>
             </tr>
           </thead>
@@ -129,6 +130,11 @@
                 <el-input-number v-model="localSkus[si].costPrice" :min="0" :precision="2" size="small"
                   controls-position="right" style="width:110px"
                   :class="{ 'is-error': isSkuActive(sku) && (!sku.costPrice || sku.costPrice <= 0) }" />
+              </td>
+              <td>
+                <el-input-number v-model="localSkus[si].virtualInventory" :min="0" size="small"
+                  controls-position="right" style="width:80px"
+                  :class="{ 'is-error': isSkuActive(sku) && (!sku.virtualInventory || sku.virtualInventory <= 0) }" />
               </td>
               <td>
                 <el-input-number v-model="localSkus[si].inventory" :min="0" size="small"
@@ -378,6 +384,7 @@ function rebuildSkus() {
       oldPrice: old ? old.oldPrice : 0,
       costPrice: old ? old.costPrice : 0,
       inventory: old ? old.inventory : 0,
+      virtualInventory: old ? old.virtualInventory : 0,
       barcode: old ? old.barcode : '',
       picture: old ? old.picture : '',
       specs: combo,
@@ -431,6 +438,7 @@ function buildSkusFromBackend(skuList: any[]) {
       oldPrice: bs.oldPrice || 0,
       costPrice: bs.costPrice || 0,
       inventory: bs.inventory || 0,
+      virtualInventory: bs.virtualInventory || bs.inventory || 0,
       barcode: bs.barcode || '',
       picture: bs.picture || '',
       specs,
@@ -482,6 +490,7 @@ function generateCombinations() {
         oldPrice: old ? old.oldPrice : 0,
         costPrice: old ? old.costPrice : 0,
         inventory: old ? old.inventory : 0,
+        virtualInventory: old ? old.virtualInventory : 0,
         barcode: old ? old.barcode : '',
         picture: old ? old.picture : '',
         specs: combo,
@@ -490,7 +499,7 @@ function generateCombinations() {
       }
     })
     // Filter: only show backend SKUs + newly checked combos (not inherited from old generation)
-    const keep = newSkus.filter((s: any) => s._isBackend || s.price > 0 || s.oldPrice > 0 || s.costPrice > 0 || s.inventory > 0 || s.picture || s.barcode)
+    const keep = newSkus.filter((s: any) => s._isBackend || s.price > 0 || s.oldPrice > 0 || s.costPrice > 0 || s.inventory > 0 || s.virtualInventory > 0 || s.picture || s.barcode)
     localSkus.splice(0, localSkus.length, ...(keep.length > 0 ? keep : newSkus))
   } else {
     rebuildSkus()
@@ -621,6 +630,7 @@ function applyJieshunSku() {
   target.costPrice = Number(selectedSku.purchase_price || 0)
   target.barcode = newBarcode
   target.inventory = 0
+  target.virtualInventory = 0
   target._jieshunSkuId = selectedSku.id
   // Default SKU picture to first main product picture if not already set
   if (!target.picture && props.productPictures && props.productPictures.length > 0) {
@@ -736,6 +746,7 @@ function mergeSkus(skuList: any[]) {
       localSkus[matchIdx].oldPrice = bs.oldPrice || 0
       localSkus[matchIdx].costPrice = bs.costPrice || 0
       localSkus[matchIdx].inventory = bs.inventory || 0
+      localSkus[matchIdx].virtualInventory = bs.virtualInventory || bs.inventory || 0
       localSkus[matchIdx].barcode = bs.barcode || ''
       localSkus[matchIdx].picture = bs.picture || ''
     }
@@ -749,6 +760,7 @@ function mergeSkus(skuList: any[]) {
       localSkus[i].oldPrice = bs.oldPrice || 0
       localSkus[i].costPrice = bs.costPrice || 0
       localSkus[i].inventory = bs.inventory || 0
+      localSkus[i].virtualInventory = bs.virtualInventory || bs.inventory || 0
       localSkus[i].barcode = bs.barcode || ''
       localSkus[i].picture = bs.picture || ''
     }
@@ -779,7 +791,7 @@ async function syncSpecToBackend(spec: any) {
 // ---- Helpers ----
 
 function isSkuActive(sku: any) {
-  return !!(sku.picture || (sku.price && sku.price > 0) || (sku.oldPrice && sku.oldPrice > 0) || (sku.inventory && sku.inventory > 0))
+  return !!(sku.picture || (sku.price && sku.price > 0) || (sku.oldPrice && sku.oldPrice > 0) || (sku.inventory && sku.inventory > 0) || (sku.virtualInventory && sku.virtualInventory > 0))
 }
 
 async function uploadSkuImage(opt: any, si: number) {
@@ -816,6 +828,7 @@ watch(() => props.jieshunProduct, (newVal) => {
       sku.costPrice = 0
       sku.barcode = ''
       sku.inventory = 0
+      sku.virtualInventory = 0
     })
   }
 })

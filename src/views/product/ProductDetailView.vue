@@ -284,7 +284,7 @@ watch(() => form.skus, () => {
   if (syncingPriceFromSkus) return
   const skus = form.skus as any[]
   if (!skus || skus.length === 0) return
-  const activeSkus = skus.filter((s: any) => s.price > 0 || s.oldPrice > 0 || s.inventory > 0 || s.picture)
+  const activeSkus = skus.filter((s: any) => s.price > 0 || s.oldPrice > 0 || s.inventory > 0 || s.virtualInventory > 0 || s.picture)
   if (activeSkus.length === 0) return
   const lowestPrice = Math.min(...activeSkus.map((s: any) => Number(s.price) || 0).filter((p: number) => p > 0))
   const lowestOldPrice = Math.min(...activeSkus.map((s: any) => Number(s.oldPrice) || 0).filter((p: number) => p > 0))
