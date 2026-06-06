@@ -71,12 +71,28 @@
             <el-icon><Plus /></el-icon>
             新增商品
           </el-button>
+          <el-button type="warning" @click="handleSaveSort">
+            <el-icon><Sort /></el-icon>
+            保存排序
+          </el-button>
         </el-form-item>
       </el-form>
     </el-card>
 
     <el-card class="table-card">
       <el-table :data="tableData" border v-loading="loading" style="width: 100%" @sort-change="handleSortChange">
+        <el-table-column label="排序" width="80" align="center">
+          <template #default="{ row }">
+            <el-input-number
+              v-model="row.sort"
+              :min="0"
+              :max="9999"
+              size="small"
+              :controls="false"
+              style="width: 60px"
+            />
+          </template>
+        </el-table-column>
         <el-table-column label="主图" width="80">
           <template #default="{ row }">
             <el-image v-if="row.picture" :src="row.picture" fit="cover" style="width:50px;height:50px;border-radius:4px" preview-teleported :preview-src-list="[row.picture]" />
@@ -151,9 +167,9 @@
 defineOptions({ name: 'ProductList' })
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getProducts, getCategories, getTypes, getBrands, toggleHotProduct, toggleProductEnable, deleteProduct } from '@/api'
+import { getProducts, getCategories, getTypes, getBrands, toggleHotProduct, toggleProductEnable, deleteProduct, updateProductSort } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Search, RefreshRight, Plus, Edit, Star, Delete } from '@element-plus/icons-vue'
+import { Search, RefreshRight, Plus, Edit, Star, Delete, Sort } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const loading = ref(false)
@@ -294,6 +310,20 @@ async function handleDelete(row) {
   try {
     await deleteProduct(row.id)
     ElMessage.success('删除成功')
+    await loadTable()
+  } catch (e) {
+    // handled
+  }
+}
+
+async function handleSaveSort() {
+  const items = tableData.value.map((row) => ({
+    productId: row.id,
+    sort: row.sort ?? 0,
+  }))
+  try {
+    await updateProductSort({ items })
+    ElMessage.success('排序保存成功')
     await loadTable()
   } catch (e) {
     // handled

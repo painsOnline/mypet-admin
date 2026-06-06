@@ -34,6 +34,10 @@ export function toggleProductEnable(id) {
   return request({ url: `/admin/product/${id}/enable`, method: 'put' })
 }
 
+export function updateProductSort(data) {
+  return request({ url: '/admin/product/sort', method: 'put', data })
+}
+
 export function generateSkus(productTypeId) {
   return request({ url: `/admin/product/generateSkus/${productTypeId}`, method: 'get' })
 }
