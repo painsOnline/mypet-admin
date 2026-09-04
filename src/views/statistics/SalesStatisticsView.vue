@@ -30,18 +30,21 @@
     <el-card class="chart-card">
       <template #header><h3>订单量趋势图</h3></template>
       <v-chart :option="volumeOption" style="height:360px" autoresize />
+      <div class="chart-total">订单总数量：<strong>{{ volumeTotal }}</strong></div>
     </el-card>
 
     <!-- Order Amount Trend -->
     <el-card class="chart-card" style="margin-top:16px">
       <template #header><h3>订单金额趋势图</h3></template>
       <v-chart :option="amountOption" style="height:360px" autoresize />
+      <div class="chart-total">总金额：<strong>¥{{ amountTotal }}</strong></div>
     </el-card>
 
     <!-- Profit Trend -->
     <el-card class="chart-card" style="margin-top:16px">
       <template #header><h3>毛利润趋势图</h3></template>
       <v-chart :option="profitOption" style="height:360px" autoresize />
+      <div class="chart-total">毛利润总额：<strong>¥{{ profitTotal }}</strong></div>
     </el-card>
   </div>
 </template>
@@ -165,6 +168,22 @@ const amountOption = computed(() => ({
   }],
 }))
 
+const volumeTotal = computed(() =>
+  trendData.value.reduce((sum, p) => sum + (p.orderCount || 0), 0)
+)
+
+const amountTotal = computed(() =>
+  trendData.value
+    .reduce((sum, p) => sum + (Number(p.totalAmount) || 0), 0)
+    .toFixed(2)
+)
+
+const profitTotal = computed(() =>
+  trendData.value
+    .reduce((sum, p) => sum + (Number(p.profitAmount) || 0), 0)
+    .toFixed(2)
+)
+
 const profitOption = computed(() => ({
   tooltip: { trigger: 'axis', valueFormatter: (val: any) => '¥' + (Number(val) || 0).toFixed(2) },
   grid: { left: 80, right: 30, top: 30, bottom: 40, containLabel: true },
@@ -197,4 +216,6 @@ onMounted(() => {
 .quick-btns { display: flex; gap: 6px; flex-wrap: wrap; }
 
 .chart-card h3 { margin: 0; font-size: 16px; color: #303133; }
+.chart-total { margin-top: 12px; padding-top: 12px; border-top: 1px solid #ebeef5; text-align: center; font-size: 15px; color: #606266; }
+.chart-total strong { font-size: 20px; color: #303133; margin-left: 8px; }
 </style>

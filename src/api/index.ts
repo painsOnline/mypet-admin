@@ -204,6 +204,15 @@ export function saveHotProducts(data) {
   return request({ url: '/admin/hot/sort', method: 'put', data })
 }
 
+// ---- LLM Config ----
+export function getLlmConfig() {
+  return request({ url: '/admin/shop/llm-config', method: 'get' })
+}
+
+export function saveLlmConfig(data) {
+  return request({ url: '/admin/shop/llm-config', method: 'put', data })
+}
+
 // ---- Jieshun Import ----
 export function jieshunSearch(data) {
   return request({ url: '/admin/jieshun/search', method: 'post', data })

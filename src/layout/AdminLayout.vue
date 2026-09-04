@@ -92,6 +92,10 @@
             <el-icon><Star /></el-icon>
             <span>热门商品</span>
           </el-menu-item>
+          <el-menu-item index="/shop/llm-config">
+            <el-icon><Cpu /></el-icon>
+            <span>AI应用配置</span>
+          </el-menu-item>
         </el-sub-menu>
         <el-menu-item index="/settings/password">
           <el-icon><Lock /></el-icon>

@@ -92,6 +92,11 @@ const routes = [
         component: () => import('@/views/settings/HotProductsView.vue'),
       },
       {
+        path: 'shop/llm-config',
+        name: 'LlmConfig',
+        component: () => import('@/views/settings/LlmConfigView.vue'),
+      },
+      {
         path: 'settings/password',
         name: 'Password',
         component: () => import('@/views/settings/PasswordView.vue'),

@@ -41,7 +41,13 @@ service.interceptors.response.use(
     return res.result
   },
   (error) => {
-    ElMessage.error(error.message || '网络错误')
+    const msg = error.response?.data?.msg || error.message || '网络错误'
+    ElMessage.error(msg)
+    if (error.response?.status === 401 || error.response?.data?.code === '401') {
+      const authStore = useAuthStore()
+      authStore.logout()
+      router.push('/login')
+    }
     return Promise.reject(error)
   }
 )
